@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
+ * Copyright (C) 2026 Gareth Palmer
+ *
  * Host tests for src/t6_jpeg.c.
  *
  * The encoder source is #included so the tests can reach its static helpers

@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
+ * Copyright (C) 2026 Gareth Palmer
+ *
  * USB transport for the MCT Trigger 6.
  *
  *  - Vendor control requests on EP0 configure the chip (modes, cursor, ...).

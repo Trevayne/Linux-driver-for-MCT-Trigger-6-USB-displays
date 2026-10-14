@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
+ * Copyright (C) 2026 Gareth Palmer
+ *
  * MCT Trigger 6 protocol wire formats; see t6_proto.h and docs/PROTOCOL.md.
  */
 #include "t6_proto.h"

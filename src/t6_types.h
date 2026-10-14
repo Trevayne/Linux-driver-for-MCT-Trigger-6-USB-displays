@@ -1,5 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
+ * Copyright (C) 2026 Gareth Palmer
+ *
  * Minimal portability layer for the "pure" parts of the driver.
  *
  * t6_proto.c and t6_jpeg.c contain no kernel-specific logic: they build and

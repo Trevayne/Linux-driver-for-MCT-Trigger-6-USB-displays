@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: GPL-2.0-only
+# Copyright (C) 2026 Gareth Palmer
 """Regenerate t6emu_data.h from the decoded Windows captures.
 
 Usage: gendata.py docs/research/windows-captures > tests/e2e/t6emu_data.h
@@ -44,6 +45,8 @@ def arr(b, indent='\t'):
     return '\n'.join(s)
 print('''/* SPDX-License-Identifier: GPL-2.0-only */
 /*
+ * Copyright (C) 2026 Gareth Palmer
+ *
  * Trigger 6 device data for t6emu, verbatim from USB captures of MCT's
  * Windows driver talking to a real JCD543 dock (capture "1925" in
  * cyrozap/mct-usb-display-adapter-re).  Generated once from the decoded

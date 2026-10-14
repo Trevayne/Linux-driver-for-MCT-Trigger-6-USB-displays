@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: GPL-2.0-only
+# Copyright (C) 2026 Gareth Palmer
 import sys, struct, glob, os
 sys.path.insert(0, sys.argv[1])
 from usbpcap import usbmon

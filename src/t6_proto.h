@@ -1,5 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
+ * Copyright (C) 2026 Gareth Palmer
+ *
  * MCT Trigger 6 ("T6") USB display protocol: wire formats.
  *
  * Everything here is pure data manipulation (no USB or DRM calls) so it can

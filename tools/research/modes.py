@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: GPL-2.0-only
+# Copyright (C) 2026 Gareth Palmer
 import sys, struct, re
 def mode(b):
     pclk, hz, ht, ha, hss, hsw, vt, va, vss, vsw, fnum, fden, idiv, mul, hp, vp, rb, fl = struct.unpack('<IHHHHHHHHHHHBBBBBB', b)

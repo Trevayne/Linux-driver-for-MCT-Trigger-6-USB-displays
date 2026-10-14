@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: GPL-2.0-only
+# Copyright (C) 2026 Gareth Palmer
 import sys, struct, glob, os
 for fn in sorted(glob.glob(sys.argv[1]+'/v*.bin')):
     b=open(fn,'rb').read(); p=b[48:]

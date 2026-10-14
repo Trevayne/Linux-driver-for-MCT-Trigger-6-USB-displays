@@ -1,4 +1,5 @@
 # SPDX-License-Identifier: GPL-2.0-only
+# Copyright (C) 2026 Gareth Palmer
 #
 # Host-side unit tests for the hardware-independent parts of the driver.
 #

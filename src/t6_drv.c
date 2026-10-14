@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
+ * Copyright (C) 2026 Gareth Palmer
+ *
  * DRM driver for USB display adapters and docks built on the Magic Control
  * Technology (MCT) Trigger 6 chip, e.g. j5create docks.
  *

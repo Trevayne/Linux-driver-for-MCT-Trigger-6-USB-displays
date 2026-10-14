@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: GPL-2.0-only
+# Copyright (C) 2026 Gareth Palmer
 import sys
 dma=open(sys.argv[1],'rb').read(); w=int(sys.argv[2]); y0=int(sys.argv[3]); xb=int(sys.argv[4]); rowstride=int(sys.argv[5]) if len(sys.argv)>6 else 5760
 v=open(sys.argv[-1],'rb').read()[48:]

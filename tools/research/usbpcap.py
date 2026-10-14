@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: GPL-2.0-only
+# Copyright (C) 2026 Gareth Palmer
 """Minimal pcapng + USBPcap parser (no external deps)."""
 import struct
 

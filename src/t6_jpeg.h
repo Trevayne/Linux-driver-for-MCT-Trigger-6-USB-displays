@@ -1,5 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
+ * Copyright (C) 2026 Gareth Palmer
+ *
  * Baseline JPEG encoder for the MCT Trigger 6 hardware JPEG decoder.
  *
  * Over a USB 2.0 link the Trigger 6 cannot receive uncompressed frames fast

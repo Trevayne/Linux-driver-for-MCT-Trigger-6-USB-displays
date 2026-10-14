@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: GPL-2.0-only
+# Copyright (C) 2026 Gareth Palmer
 import sys, zlib, struct
 fn,w,h,swap,out=sys.argv[1],int(sys.argv[2]),int(sys.argv[3]),sys.argv[4]=='vu',sys.argv[5]
 sc=8

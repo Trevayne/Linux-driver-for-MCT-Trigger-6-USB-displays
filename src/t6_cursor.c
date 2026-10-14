@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
+ * Copyright (C) 2026 Gareth Palmer
+ *
  * Hardware cursor.
  *
  * The Trigger 6 composites an ARGB cursor over its scanout, as MCT's

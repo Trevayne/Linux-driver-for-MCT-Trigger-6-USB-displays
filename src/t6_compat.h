@@ -1,5 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
+ * Copyright (C) 2026 Gareth Palmer
+ *
  * Kernel API differences between the supported kernels (6.1 .. 7.x).
  *
  * The driver is built out of tree (DKMS) against whatever kernel a distro

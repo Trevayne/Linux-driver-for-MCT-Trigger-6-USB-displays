@@ -108,4 +108,16 @@ See [docs/TESTING.md](docs/TESTING.md) for all test layers, and
 
 ## License
 
-GPL-2.0-only; see [LICENSE](LICENSE).
+Copyright (C) 2026 Gareth Palmer
+
+This program is free software; you can redistribute it and/or modify it under
+the terms of the GNU General Public License version 2 only, as published by
+the Free Software Foundation. It is distributed in the hope that it will be
+useful, but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See [LICENSE](LICENSE)
+for the full text.
+
+Each source file carries an `SPDX-License-Identifier: GPL-2.0-only` tag. The
+licence matches the kernel's own and that of MCT's GPL-2.0 `triggerdm`
+reference driver, which was used as a protocol source. No code was copied
+from it.

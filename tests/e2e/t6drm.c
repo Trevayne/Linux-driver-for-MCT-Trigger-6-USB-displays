@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
+ * Copyright (C) 2026 Gareth Palmer
+ *
  * t6drm: a minimal KMS client that drives mct_t6 through a known sequence
  * for the end-to-end test, using raw DRM ioctls (no libdrm).
  *

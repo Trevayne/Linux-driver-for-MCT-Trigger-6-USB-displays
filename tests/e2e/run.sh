@@ -1,5 +1,6 @@
 #!/bin/bash
 # SPDX-License-Identifier: GPL-2.0-only
+# Copyright (C) 2026 Gareth Palmer
 #
 # End-to-end test of mct_t6: the real driver in a User-Mode Linux kernel,
 # talking over dummy_hcd to a software Trigger 6 (t6emu, via raw-gadget),

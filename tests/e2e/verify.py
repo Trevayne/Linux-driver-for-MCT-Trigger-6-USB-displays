@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: GPL-2.0-only
+# Copyright (C) 2026 Gareth Palmer
 """Check the output of an mct_t6 end-to-end run (see run.sh).
 
 usage: verify.py OUTDIR [--data t6emu_data.h]

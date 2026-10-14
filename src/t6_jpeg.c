@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
+ * Copyright (C) 2026 Gareth Palmer
+ *
  * Baseline JPEG encoder; see t6_jpeg.h for the design.
  *
  * The algorithms are the textbook ones from ITU-T T.81 (JPEG) and the IJG

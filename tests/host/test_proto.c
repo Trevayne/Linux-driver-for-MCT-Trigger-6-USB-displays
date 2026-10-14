@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
+ * Copyright (C) 2026 Gareth Palmer
+ *
  * Host tests for src/t6_proto.c.  Golden byte vectors come from USB captures
  * of MCT's Windows driver (see docs/PROTOCOL.md for provenance).
  */

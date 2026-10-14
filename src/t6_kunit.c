@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
+ * Copyright (C) 2026 Gareth Palmer
+ *
  * KUnit tests for the hardware-independent parts of mct_t6.
  *
  * The host tests in tests/host cover the same code more exhaustively (with an

@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
+ * Copyright (C) 2026 Gareth Palmer
+ *
  * KMS for the MCT Trigger 6: one primary plane, cursor plane, CRTC, encoder
  * and connector per video output ("head").
  *

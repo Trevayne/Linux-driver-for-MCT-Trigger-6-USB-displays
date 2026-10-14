@@ -1,5 +1,6 @@
 #!/bin/sh
 # SPDX-License-Identifier: GPL-2.0-only
+# Copyright (C) 2026 Gareth Palmer
 #
 # PID 1 inside the UML test kernel (started by run.sh as init=).  The root
 # filesystem is the host's, through hostfs, so host binaries just work.

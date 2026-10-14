@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: GPL-2.0-only
+# Copyright (C) 2026 Gareth Palmer
 import sys
 dma=open(sys.argv[1],'rb').read(); w=int(sys.argv[2])
 for vf in sys.argv[3:]:

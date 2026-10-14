@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
+ * Copyright (C) 2026 Gareth Palmer
+ *
  * t6emu: software MCT Trigger 6 for end-to-end testing of mct_t6.
  *
  * Runs inside the test kernel (UML) and binds to dummy_udc through

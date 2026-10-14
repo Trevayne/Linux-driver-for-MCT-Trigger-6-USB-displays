@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: GPL-2.0-only
+# Copyright (C) 2026 Gareth Palmer
 import sys
 d=open(sys.argv[1],'rb').read()
 n=len(d)

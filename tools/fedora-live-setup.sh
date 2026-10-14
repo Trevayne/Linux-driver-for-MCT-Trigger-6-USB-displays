@@ -1,5 +1,6 @@
 #!/bin/bash
 # SPDX-License-Identifier: GPL-2.0-only
+# Copyright (C) 2026 Gareth Palmer
 #
 # Prepare a Fedora session (typically a live USB) to build, test and debug
 # mct_t6 on real hardware.  Safe to re-run.  Run as your normal user; it uses

@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
+ * Copyright (C) 2026 Gareth Palmer
+ *
  * Frame pipeline: from KMS damage to JPEG objects on the wire.
  *
  * Producer (KMS commit, t6_stream_update()):

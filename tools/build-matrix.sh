@@ -1,5 +1,6 @@
 #!/bin/sh
 # SPDX-License-Identifier: GPL-2.0-only
+# Copyright (C) 2026 Gareth Palmer
 #
 # Compile-test the driver (and its KUnit module) against several kernel trees
 # with extra warnings (W=1) and, if installed, the sparse static checker.

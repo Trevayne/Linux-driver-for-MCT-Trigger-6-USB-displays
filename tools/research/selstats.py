@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: GPL-2.0-only
+# Copyright (C) 2026 Gareth Palmer
 import pickle, sys, collections
 ev=pickle.load(open(sys.argv[1],'rb'))
 c=collections.Counter()

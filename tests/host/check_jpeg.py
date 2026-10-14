@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: GPL-2.0-only
+# Copyright (C) 2026 Gareth Palmer
 """Decode the JPEGs written by test_jpeg with an independent decoder.
 
 test_jpeg writes <name>.jpg next to <name>.rgb (packed RGB24 source pixels).

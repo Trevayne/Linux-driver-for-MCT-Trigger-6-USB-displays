@@ -1,4 +1,5 @@
 # SPDX-License-Identifier: GPL-2.0-only
+# Copyright (C) 2026 Gareth Palmer
 #
 # Out-of-tree build of the mct_t6 DRM driver.
 #

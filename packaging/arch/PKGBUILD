@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: GPL-2.0-only
+# Copyright (C) 2026 Gareth Palmer
 # Maintainer: Gareth Palmer <gareth@one-space.co.za>
 #
 # Build from a checkout:  cd packaging/arch && makepkg -si

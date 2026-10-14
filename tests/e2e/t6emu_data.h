@@ -1,5 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
+ * Copyright (C) 2026 Gareth Palmer
+ *
  * Trigger 6 device data for t6emu, verbatim from USB captures of MCT's
  * Windows driver talking to a real JCD543 dock (capture "1925" in
  * cyrozap/mct-usb-display-adapter-re).  Generated once from the decoded

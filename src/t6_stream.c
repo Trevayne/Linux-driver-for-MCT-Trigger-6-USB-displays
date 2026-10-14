@@ -128,10 +128,13 @@ static int t6_encode_rows(struct t6_stream *s)
 		job->count = min(per, n - min(n, j * per));
 	}
 
-	/* Queue all but the first job; run the first one here. */
+	/*
+	 * Queue all but the first job on the driver's unbound workqueue (the
+	 * system unbound queue is deprecated from 6.17); run the first here.
+	 */
 	for (j = 1; j < njobs; j++)
 		if (s->jobs[j].count)
-			queue_work(system_unbound_wq, &s->jobs[j].work);
+			queue_work(s->head->t6->wq, &s->jobs[j].work);
 	t6_encode_job_run(&s->jobs[0]);
 	ret = s->jobs[0].err;
 

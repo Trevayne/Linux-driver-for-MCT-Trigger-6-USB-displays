@@ -133,8 +133,14 @@ static void t6_cursor_update(struct drm_plane *plane,
 		goto out;
 	}
 
+	/*
+	 * The shape changes only with a new framebuffer or explicit damage.
+	 * (No damage clips means "everything" to the damage helpers, which
+	 * would re-upload the shape on every move.)
+	 */
 	if (!cs->uploaded || new->fb != old->fb ||
-	    drm_atomic_helper_damage_merged(old, new, &damage)) {
+	    (drm_plane_get_damage_clips_count(new) &&
+	     drm_atomic_helper_damage_merged(old, new, &damage))) {
 		ret = t6_cursor_upload(head, new);
 		cs->uploaded = !ret;
 		if (ret)

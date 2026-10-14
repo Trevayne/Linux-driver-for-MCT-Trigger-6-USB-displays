@@ -11,8 +11,8 @@ dock's outputs as ordinary monitors: hot-plug, resolution changes, a hardware
 cursor and a text console all work through the standard interfaces.
 
 > **Status: prototype.** It builds warning-free on kernels 6.1 through 7.2 and
-> passes its host, KUnit and emulated-device tests. It has **not yet been run
-> on real hardware.** See [docs/TESTING.md](docs/TESTING.md) for the
+> passes its host tests, KUnit, and an end-to-end test against an emulated chip
+> under KASAN and lockdep. It has **not yet been run on real hardware.** See [docs/TESTING.md](docs/TESTING.md) for the
 > hardware bring-up checklist.
 
 ## How it works

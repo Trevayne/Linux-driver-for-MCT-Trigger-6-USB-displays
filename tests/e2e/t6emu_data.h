@@ -4,7 +4,8 @@
  * Windows driver talking to a real JCD543 dock (capture "1925" in
  * cyrozap/mct-usb-display-adapter-re).  Generated once from the decoded
  * captures (modes1925.txt / ctrl-1925.txt); the timing tables were checked
- * byte for byte against the raw 0x89 control reads.  Do not edit by hand.
+ * byte for byte against the raw 0x89 control reads.  Do not edit by hand:
+ * regenerate with tests/e2e/gendata.py docs/research/windows-captures.
  */
 #ifndef T6EMU_DATA_H
 #define T6EMU_DATA_H

@@ -77,7 +77,7 @@ independent more simply, but they cost bandwidth and are a less exercised
 decoder feature. MCT's reference driver doesn't use them either.
 
 **Parallelism.** Dirty rows are split evenly over up to `encode_jobs` work
-items on the system's unbound workqueue. A full 1080p frame takes ~18 ms on one
+items on the driver's own unbound workqueue. A full 1080p frame takes ~18 ms on one
 core in the host benchmark, so a few cores give ample headroom for 60 fps;
 desktop updates are typically a few rows.
 

@@ -366,7 +366,16 @@ static int t6_crtc_atomic_check(struct drm_crtc *crtc,
 	if (new->enable && new->mode_changed &&
 	    t6_crtc_mode_valid(crtc, &new->mode) != MODE_OK)
 		return -EINVAL;
-	return drm_atomic_add_affected_planes(state, crtc);
+
+	/*
+	 * Only a modeset needs every plane.  Adding the primary plane to a
+	 * cursor-only commit gives it an update without damage clips, which
+	 * the damage helpers treat as full damage: every pointer move would
+	 * re-encode and re-send the whole frame.
+	 */
+	if (drm_atomic_crtc_needs_modeset(new))
+		return drm_atomic_add_affected_planes(state, crtc);
+	return 0;
 }
 
 /* MCT's driver lets an output settle this long between off and a new mode. */
@@ -438,6 +447,17 @@ static void t6_crtc_atomic_disable(struct drm_crtc *crtc,
 
 	drm_crtc_vblank_off(crtc);
 	t6_stream_stop(head);
+
+	/*
+	 * atomic_flush() is not called for a CRTC being switched off, so its
+	 * pending event must be completed here or the commit never finishes.
+	 */
+	spin_lock_irq(&crtc->dev->event_lock);
+	if (crtc->state->event && !crtc->state->active) {
+		drm_crtc_send_vblank_event(crtc, crtc->state->event);
+		crtc->state->event = NULL;
+	}
+	spin_unlock_irq(&crtc->dev->event_lock);
 
 	if (!drm_dev_enter(crtc->dev, &idx))
 		return;
@@ -573,8 +593,9 @@ int t6_kms_init(struct t6_device *t6)
 	if (ret)
 		return ret;
 
-	drm->mode_config.min_width = 320;
-	drm->mode_config.min_height = 200;
+	/* No lower bound: it applies to every framebuffer, cursors included. */
+	drm->mode_config.min_width = 0;
+	drm->mode_config.min_height = 0;
 	drm->mode_config.max_width = 2048;	/* bounded by the 4 MiB NV12 slot */
 	drm->mode_config.max_height = 2048;
 	drm->mode_config.preferred_depth = 24;

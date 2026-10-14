@@ -50,6 +50,7 @@ static const char *outdir, *status_path;
 static int drm_fd = -1;
 static FILE *manifest;
 static unsigned int settle_ms = 1500, timeout_ms = 120000;
+static unsigned int failures;
 
 static void die(const char *fmt, ...) __attribute__((format(printf, 1, 2)));
 static void die(const char *fmt, ...)
@@ -378,10 +379,20 @@ static void cursor2(uint32_t crtc, uint32_t flags, uint32_t handle,
 		.handle = handle,
 	};
 
-	xioctl(DRM_IOCTL_MODE_CURSOR2, &c, what);
-	printf("t6drm: cursor: %s (%d, %d)\n", what, x, y);
-	fprintf(manifest, "%s\n    {\"cursor\": \"%s\", \"x\": %d, \"y\": %d}",
-		nsteps++ ? "," : "", what, x, y);
+	int ret, err = 0;
+
+	/* A failure here is recorded, not fatal, so later steps still run. */
+	do {
+		ret = ioctl(drm_fd, DRM_IOCTL_MODE_CURSOR2, &c);
+	} while (ret < 0 && errno == EINTR);
+	if (ret < 0) {
+		err = errno;
+		failures++;
+	}
+	printf("t6drm: cursor: %s (%d, %d): %s\n", what, x, y,
+	       err ? strerror(err) : "ok");
+	fprintf(manifest, "%s\n    {\"cursor\": \"%s\", \"x\": %d, \"y\": %d, \"error\": %d}",
+		nsteps++ ? "," : "", what, x, y, err);
 	fflush(manifest);
 	/* Cursor requests are synchronous; give the log a moment anyway. */
 	sleep_ms(200);
@@ -526,6 +537,6 @@ int main(int argc, char **argv)
 	dumb_destroy(&cur);
 	dumb_destroy(&scr);
 	close(drm_fd);
-	printf("t6drm: done, %u steps\n", nsteps);
-	return 0;
+	printf("t6drm: done, %u steps, %u failure(s)\n", nsteps, failures);
+	return failures ? 1 : 0;
 }

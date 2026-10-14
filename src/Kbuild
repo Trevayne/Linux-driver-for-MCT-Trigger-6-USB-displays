@@ -1,0 +1,16 @@
+# SPDX-License-Identifier: GPL-2.0-only
+obj-m += mct_t6.o
+
+mct_t6-y := \
+	t6_drv.o \
+	t6_usb.o \
+	t6_kms.o \
+	t6_cursor.o \
+	t6_stream.o \
+	t6_proto.o \
+	t6_jpeg.o
+
+# KUnit tests for the hardware-independent code.  t6_kunit.c includes
+# t6_proto.c and t6_jpeg.c itself, since an object may belong to one module.
+obj-$(CONFIG_MCT_T6_KUNIT_TEST) += mct_t6_test.o
+mct_t6_test-y := t6_kunit.o

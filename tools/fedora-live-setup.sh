@@ -18,7 +18,7 @@ say "Kernel $kver"
 # --- Packages ----------------------------------------------------------------
 
 # Required to build the module and run the host tests.
-required=(gcc make elfutils-libelf-devel git python3-pillow python3-numpy)
+required=(gcc make elfutils-libelf-devel git libasan libubsan python3-pillow python3-numpy)
 # Useful for bring-up and debugging; failures are not fatal.
 optional=(usbutils drm-utils wireshark-cli sparse mokutil)
 

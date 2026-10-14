@@ -16,8 +16,16 @@ Run `tools/fedora-live-setup.sh`. It installs gcc and the matching
 kernel-devel, builds and unit-tests the module, and warns about Secure Boot,
 which blocks the unsigned module: disable it in the firmware. It must be
 re-run after each live boot. Before going further, confirm the dock is seen
-(`lsusb -d 0711:`) and note the link speed. A SuperSpeed port on this machine
-would be a big throughput win over the USB 2.0 link seen under Windows.
+(`lsusb -d 0711:`) and note the link speed. 480M may just mean the laptop port
+is USB 2 only: check the port map (debugging.md, "Link speed").
+
+## Notes from earlier sessions: read these first
+
+- `machines.md`: per-machine log: port maps, what was tested, what's left.
+  Add a section for every new machine.
+- `debugging.md`: session hygiene (sudo, waiting for unplugs, the module
+  reload cycle), usbmon filters, DRM debugfs, and every bug found on hardware
+  with its symptoms.
 
 ## Quick reference
 

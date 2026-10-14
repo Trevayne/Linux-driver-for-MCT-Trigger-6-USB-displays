@@ -10,10 +10,12 @@ The driver registers a normal DRM device, so GNOME, KDE, Sway and X11 see the
 dock's outputs as ordinary monitors: hot-plug, resolution changes, a hardware
 cursor and a text console all work through the standard interfaces.
 
-> **Status: prototype.** It builds warning-free on kernels 6.1 through 7.2 and
-> passes its host tests, KUnit, and an end-to-end test against an emulated chip
-> under KASAN and lockdep. It has **not yet been run on real hardware.** See [docs/TESTING.md](docs/TESTING.md) for the
-> hardware bring-up checklist.
+> **Status: early testing on hardware.** It builds warning-free on kernels
+> 6.1 through 7.2 and passes its host tests, KUnit, and an end-to-end test
+> against an emulated chip under KASAN and lockdep. On a real j5create HDMI+VGA
+> dock (Fedora 44, kernel 6.19, KDE), both outputs, the JPEG stream and dock
+> hot-plug and the hardware cursor work. See
+> [docs/TESTING.md](docs/TESTING.md) for the bring-up checklist.
 
 ## How it works
 
@@ -37,48 +39,21 @@ source of every fact.
 
 There are no runtime dependencies: no daemon, no userspace libraries.
 
-## Installation (DKMS)
+## Installation
 
-DKMS rebuilds the module automatically whenever the kernel is updated.
-
-**Debian / Ubuntu**
+Full instructions for **Fedora**, **Debian / Ubuntu** and **Arch**, with DKMS
+or a manual build, plus Secure Boot, updating and troubleshooting, are in
+**[docs/INSTALL.md](docs/INSTALL.md)**. In short, on Fedora:
 
 ```sh
-sudo apt install dkms linux-headers-$(uname -r)
-sudo cp -r . /usr/src/mct-t6-0.1.0
+sudo dnf install gcc make dkms kernel-devel-$(uname -r)
+make clean && sudo mkdir -p /usr/src/mct-t6-0.1.0
+sudo cp -r dkms.conf src /usr/src/mct-t6-0.1.0/
 sudo dkms install mct-t6/0.1.0
-```
-
-**Fedora**
-
-```sh
-sudo dnf install dkms kernel-devel-$(uname -r)
-sudo cp -r . /usr/src/mct-t6-0.1.0
-sudo dkms install mct-t6/0.1.0
-```
-
-**Arch**
-
-```sh
-sudo pacman -S dkms linux-headers
-cd packaging/arch && makepkg -si
 ```
 
 Then plug in the dock. The module loads automatically through its USB device
 table, and the outputs show up in your display settings.
-
-**Secure Boot:** an unsigned module will not load. Debian/Ubuntu and Fedora's
-DKMS sign modules with a machine owner key (MOK) that you enroll once with
-`mokutil`; follow your distribution's DKMS instructions.
-
-To remove: `sudo dkms remove mct-t6/0.1.0 --all`.
-
-### Building by hand
-
-```sh
-make                       # build against the running kernel
-sudo insmod src/mct_t6.ko
-```
 
 ## Module parameters
 
@@ -116,8 +91,8 @@ See [docs/TESTING.md](docs/TESTING.md) for all test layers, and
 
 ## Limitations and roadmap
 
-- Not yet validated on hardware: mode set, cursor and hot-plug follow MCT's own
-  driver exactly, but need confirming on a real dock.
+- Hardware validation so far covers one dock on one laptop, over USB 2.0 only:
+  see docs/TESTING.md for what's still open.
 - No 4K: the chip can do 3840×2160@30 over SuperSpeed with a different memory
   layout, which is not implemented.
 - Each update sends a whole-frame JPEG. The Windows driver can also patch

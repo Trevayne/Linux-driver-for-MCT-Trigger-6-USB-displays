@@ -28,6 +28,18 @@ IDs never appear on the wire.
 | `0x02` bulk OUT | all video (and audio) data |
 | `0x83` interrupt IN | 64-byte event packets |
 
+**[HW]** j5create HDMI+VGA dock, `0711:5601`, Fedora 6.19 laptop, 2026-10-14:
+`bcdUSB 2.00`, `bcdDevice 10.10`, `MaxPower 248mA`, no serial string. The interface
+and endpoints are exactly as in the table above (`0x81`/`0x02` bulk, 512-byte
+packets; `0x83` interrupt, 64 bytes). The device sat at 480M behind a Genesys
+`05e3:0610` hub (typically the USB 2 half of a Genesys USB 3 hub), alongside
+the dock's AX88179 USB 3 Ethernet. The laptop port used turned out to be USB 2.0
+only (ACPI shows no SuperSpeed peer for it), so the link speed says nothing
+about the dock. The hub and the AX88179 report `bcdUSB 2.10` (USB 3 devices
+running at USB 2 speed), so the dock is USB 3. The T6 reports `2.00`, so in
+this dock it is probably a USB 2 device on the hub's USB 2 side, and may stay at
+480M even on a SuperSpeed port. Not yet tried on one.
+
 The chip runs at USB 2.0 High Speed or USB 3.x SuperSpeed, depending on the dock
 and the port. On High Speed, uncompressed frames are far too large (1080p60 XRGB
 is ~370 MB/s against ~35 MB/s of real bulk throughput), so frames must be JPEG
@@ -210,3 +222,12 @@ supported.
 
 Position is set with `0x04` / `0x06`. Negative coordinates are sent as the one's
 complement of their magnitude, which is what MCT's driver does.
+
+**[HW]** There are shape slots 0–9 per head (wValue of the shape and state
+requests; MCT's `t6.h`). The chip draws the shown slot straight from its
+buffer, so uploading into the visible slot (5 writes, about 10 ms for 64x64)
+shows half old, half new shape. Showing slot N (`0x05`/`0x07`, wValue N,
+wIndex 1) replaces whichever slot was shown, with no hide needed. The driver
+therefore double-buffers: upload into the other slot, then show it. Verified on
+a j5create dock with KWin, 2026-10-14. MCT's Linux driver only uses slot 0;
+the Windows driver never uses the hardware cursor.

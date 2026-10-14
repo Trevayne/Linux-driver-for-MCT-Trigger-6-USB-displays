@@ -108,10 +108,18 @@ isolates one layer.
 
 Things that only hardware can confirm, in rough order of risk:
 
-- that the chip accepts JPEG frames on head 0 at USB 2.0 speed (MCT's Linux
-  driver does exactly this);
-- whether the chip reports frame-done fences for JPEG frames (the driver copes
-  either way: see `fences:` in the stats file);
+- ~~that the chip accepts JPEG frames on head 0 at USB 2.0 speed~~: yes, on both
+  heads (2026-10-14, see PROTOCOL.md **[HW]** and
+  `.claude/skills/hardware-bringup/machines.md`);
+- ~~whether the chip reports frame-done fences for JPEG frames~~: yes
+  (`fences: … (reported)`, interrupt byte `04` per frame);
+- ~~whether showing cursor slot N hides the previously shown slot~~: yes,
+  so the driver double-buffers shapes in slots 0/1;
 - whether cursor alpha is premultiplied;
-- whether VGA connection status is reported or only DDC works;
-- real throughput on this laptop's USB 2.0 link.
+- ~~whether VGA connection status is reported or only DDC works~~: only DDC
+  (status `0x87` is always 0 for VGA); DDC answers garbage for about a second
+  after plug-in;
+- whether the T6 links at SuperSpeed on a USB 3 port (on this dock it reports
+  `bcdUSB 2.00`);
+- real throughput on this laptop's USB 2.0 link (single-frame numbers so far:
+  about 250 KB per 1080p frame at q85, about 7 ms to send).

@@ -24,7 +24,7 @@ and why) and docs/TESTING.md (test layers and the hardware checklist).
 
 ## Resume here: status and next step
 
-Development so far happened on WSL without hardware. Done:
+Development first happened on WSL without hardware. Done there:
 
 - protocol research (docs/PROTOCOL.md, docs/research/);
 - the driver (`src/`);
@@ -39,17 +39,37 @@ Development so far happened on WSL without hardware. Done:
   cursor moves re-sent whole frames; the cursor shape was re-uploaded on
   every move; and the code used the deprecated `system_unbound_wq`.
 
-**The driver has never run on real hardware.** The next step is hardware
-bring-up, most likely from a **Fedora live USB**:
+**Hardware bring-up started 2026-10-14** on a Lenovo 82QD laptop, Fedora 44
+KDE live USB, kernel 6.19.10. The per-machine log and debugging playbook are
+in `.claude/skills/hardware-bringup/{machines,debugging}.md`: **read them
+first.** Working: discovery, HDMI and VGA (EDID, modes, picture), the JPEG
+stream with reported fences, dock hot-unplug and replug, and the hardware
+cursor. Two cursor bugs found on hardware are fixed: clipped shapes at screen
+edges, and shape tearing (now double-buffered in chip slots 0/1). The unplug
+`WARNING drm_mode_config.c:578` is a 6.19.10 DRM core issue, not ours.
+User-facing install guide: docs/INSTALL.md.
+
+Next, on hardware:
+- A SuperSpeed port. So far the dock has only been on a USB 2-only laptop port;
+  the 10 Gbps port held the live USB.
+- The throughput test with video (checklist step 8), fbcon on a text VT,
+  modetest, suspend/resume, and cursor alpha (premultiplied or not).
+- Re-run the full compile matrix and the e2e test on the WSL machine. Both need
+  kernel trees that aren't available on the live USB. The e2e emulator now
+  rejects cursor slots > 9, and should gain a shape-change step that checks
+  the slot alternation.
+
+To start a session on the live USB:
 
 1. Clone this repo (the private remote needs the user's SSH key on the live
    session).
-2. Run `tools/fedora-live-setup.sh`. It installs the toolchain and the
-   matching `kernel-devel`, builds the module, runs the host tests, and checks
-   Secure Boot and that the dock is present. It must be re-run after every
-   live boot: packages live in RAM.
-3. Follow the `hardware-bringup` skill / docs/TESTING.md checklist step by
-   step. Record every hardware finding in docs/PROTOCOL.md as **[HW]**.
+2. Make sure `sudo -n true` works (see debugging.md), then run
+   `tools/fedora-live-setup.sh`. It installs the toolchain and the matching
+   `kernel-devel`, builds the module, runs the host tests, and checks Secure
+   Boot and that the dock is present. Re-run it after every live boot.
+3. Follow the `hardware-bringup` skill / docs/TESTING.md checklist. Record
+   protocol findings in docs/PROTOCOL.md as **[HW]**, and setup findings in
+   machines.md.
 
 Live-USB gotchas:
 
@@ -63,9 +83,12 @@ Live-USB gotchas:
 - The real USB device is **0711:5601** "T6 USB Station". 0711:5621 (display)
   and 0711:5640 (audio) are *virtual* children created by the Windows bus
   driver `t6sta.sys`; they never appear on the wire.
-- On the dev laptop the dock runs at **USB 2.0 High Speed** (behind a Genesys
-  05e3:0610 USB 2.0 hub on root port HS01), so JPEG frames are mandatory. MCT's
-  own Linux driver switches to JPEG below SuperSpeed.
+- The dock is USB 3: its hub and Ethernet report bcdUSB 2.10. But the laptop
+  port used so far (HS01 / `usb3-port1`) is **USB 2.0 only**, so everything
+  ran at 480M. The T6 itself reports bcdUSB 2.00 and may be USB 2 only inside
+  the dock. JPEG is mandatory below SuperSpeed (MCT's driver does the same).
+- Cursor shapes: slots 0–9 per head. Showing a slot replaces the shown one;
+  the driver double-buffers 0/1.
 - The best protocol source is MCT's GPL reference driver
   https://github.com/mcttrigger/triggerdm (`t6usbdongle.c`, `main.c`, `t6.h`,
   `t6bulkdef.h`). The Windows usbmon captures are in

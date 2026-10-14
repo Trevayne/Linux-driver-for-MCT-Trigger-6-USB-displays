@@ -1,0 +1,4 @@
+link: high-speed
+fences: sent 28189 done 28188 (reported)
+head 0: 1920x1080 quality 85 frames 11271 bytes 2770863497 last 187235 rows 766428 dropped 0 fence_timeouts 0 encode_ms 172199 send_ms 72881
+head 1: 1280x1024 quality 85 frames 16918 bytes 3659006808 last 238366 rows 1082752 dropped 0 fence_timeouts 0 encode_ms 189468 send_ms 98546

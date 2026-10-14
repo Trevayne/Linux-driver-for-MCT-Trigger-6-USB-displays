@@ -9,8 +9,13 @@
  * a USB 2.0 link.
  *
  * Shape upload: an 8-byte header (type, width, height, pitch) followed by
- * the ARGB8888 pixels, written in chunks of at most 4 KiB with wIndex
- * giving the byte offset of each chunk.
+ * the ARGB8888 pixels, written in chunks of at most 4 KiB with wValue the
+ * shape slot (0-9) and wIndex the byte offset of each chunk.
+ *
+ * The chip draws the shown slot straight from its buffer, so a 64x64 upload
+ * (five writes, ~10 ms) into the visible slot shows half old, half new
+ * shape.  New shapes therefore go into the other of two slots, which is
+ * then shown with a single state request.
  */
 #include <linux/slab.h>
 
@@ -59,20 +64,25 @@ static int t6_cursor_check(struct drm_plane *plane,
 	if (ret || !new->visible)
 		return ret;
 
-	if (drm_rect_width(&new->src) >> 16 > T6_CURSOR_MAX_SIZE ||
-	    drm_rect_height(&new->src) >> 16 > T6_CURSOR_MAX_SIZE)
+	if (new->src_w >> 16 > T6_CURSOR_MAX_SIZE ||
+	    new->src_h >> 16 > T6_CURSOR_MAX_SIZE)
 		return -EINVAL;
 	return 0;
 }
 
-static int t6_cursor_upload(struct t6_head *head,
+static int t6_cursor_upload(struct t6_head *head, u8 slot,
 			    struct drm_plane_state *new)
 {
 	struct drm_shadow_plane_state *shadow = to_drm_shadow_plane_state(new);
 	struct drm_framebuffer *fb = new->fb;
-	unsigned int w = drm_rect_width(&new->src) >> 16;
-	unsigned int h = drm_rect_height(&new->src) >> 16;
-	unsigned int x0 = new->src.x1 >> 16, y0 = new->src.y1 >> 16;
+	/*
+	 * Upload the whole, unclipped cursor: new->src is clipped to the
+	 * CRTC, so near a screen edge it holds only a slice of the shape, and
+	 * that slice would stay on the chip after the pointer moves back.
+	 * The chip clips by position itself (negative coordinates included).
+	 */
+	unsigned int w = new->src_w >> 16, h = new->src_h >> 16;
+	unsigned int x0 = new->src_x >> 16, y0 = new->src_y >> 16;
 	size_t total = T6_CURSOR_HDR_LEN + (size_t)w * h * 4, off;
 	const u8 *src;
 	unsigned int y;
@@ -97,18 +107,18 @@ static int t6_cursor_upload(struct t6_head *head,
 		ret = t6_ctrl_out(head->t6,
 				  t6_req(head, T6_REQ_SET_CURSOR1_SHAPE,
 					 T6_REQ_SET_CURSOR2_SHAPE),
-				  0, off, buf + off,
+				  slot, off, buf + off,
 				  min_t(size_t, T6_CURSOR_CHUNK, total - off));
 out:
 	kfree(buf);
 	return ret;
 }
 
-static int t6_cursor_show(struct t6_head *head, bool visible)
+static int t6_cursor_show(struct t6_head *head, u8 slot, bool visible)
 {
 	return t6_ctrl_out(head->t6, t6_req(head, T6_REQ_SET_CURSOR1_STATE,
 					    T6_REQ_SET_CURSOR2_STATE),
-			   0, visible, NULL, 0);
+			   slot, visible, NULL, 0);
 }
 
 static void t6_cursor_update(struct drm_plane *plane,
@@ -121,6 +131,7 @@ static void t6_cursor_update(struct drm_plane *plane,
 	struct t6_head *head = container_of(plane, struct t6_head, cursor);
 	struct t6_cursor_state *cs = &head->cursor_state;
 	struct drm_rect damage;
+	u8 slot = cs->slot;
 	int idx, ret = 0;
 
 	if (!drm_dev_enter(plane->dev, &idx))
@@ -128,7 +139,7 @@ static void t6_cursor_update(struct drm_plane *plane,
 
 	if (!new->visible || !new->fb) {
 		if (cs->visible)
-			ret = t6_cursor_show(head, false);
+			ret = t6_cursor_show(head, cs->slot, false);
 		cs->visible = false;
 		goto out;
 	}
@@ -141,7 +152,10 @@ static void t6_cursor_update(struct drm_plane *plane,
 	if (!cs->uploaded || new->fb != old->fb ||
 	    (drm_plane_get_damage_clips_count(new) &&
 	     drm_atomic_helper_damage_merged(old, new, &damage))) {
-		ret = t6_cursor_upload(head, new);
+		/* Into the hidden slot; the shown one stays intact meanwhile. */
+		if (cs->uploaded)
+			slot ^= 1;
+		ret = t6_cursor_upload(head, slot, new);
 		cs->uploaded = !ret;
 		if (ret)
 			goto out;
@@ -151,9 +165,11 @@ static void t6_cursor_update(struct drm_plane *plane,
 					   T6_REQ_SET_CURSOR2_POS),
 			  t6_cursor_coord(new->crtc_x),
 			  t6_cursor_coord(new->crtc_y), NULL, 0);
-	if (!ret && !cs->visible) {
-		ret = t6_cursor_show(head, true);
+	if (!ret && (!cs->visible || slot != cs->slot)) {
+		ret = t6_cursor_show(head, slot, true);
 		cs->visible = !ret;
+		if (!ret)
+			cs->slot = slot;
 	}
 out:
 	if (ret)

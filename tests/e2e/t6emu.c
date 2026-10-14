@@ -83,6 +83,7 @@ static const uint32_t t6_versions[] = {
 #define RESET_FRAMES		10	/* frames after a mode set with 0x80 */
 #define CURSOR_HDR_LEN		8
 #define CURSOR_MAX_BYTES	(CURSOR_HDR_LEN + 128 * 128 * 4)
+#define CURSOR_MAX_SLOT		9	/* shape slots 0-9 per head (MCT t6.h) */
 #define MAX_OBJECT		(16 * MiB)	/* sanity bound, > any ring */
 
 enum {
@@ -808,7 +809,10 @@ static bool vendor_out(const struct usb_ctrlrequest *c, const uint8_t *data,
 			return false;
 		if (c->wIndex > 1)
 			err_add(errs, "cursor state wIndex %u", c->wIndex);
-		sb_printf(b, ",\"head\":%u,\"visible\":%u", head, c->wIndex);
+		if (c->wValue > CURSOR_MAX_SLOT)
+			err_add(errs, "cursor state slot %u", c->wValue);
+		sb_printf(b, ",\"head\":%u,\"slot\":%u,\"visible\":%u", head,
+			  c->wValue, c->wIndex);
 		return true;
 	case REQ_CURSOR2_SHAPE:
 		head = 1;
@@ -820,6 +824,8 @@ static bool vendor_out(const struct usb_ctrlrequest *c, const uint8_t *data,
 		off = c->wIndex;
 		if (len > 4096)
 			err_add(errs, "cursor chunk of %u bytes", len);
+		if (c->wValue > CURSOR_MAX_SLOT)
+			err_add(errs, "cursor shape slot %u", c->wValue);
 		if (off + len > sizeof(h->cursor)) {
 			err_add(errs, "cursor data beyond 128x128");
 			return false;

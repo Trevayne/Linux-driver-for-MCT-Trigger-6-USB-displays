@@ -103,6 +103,7 @@ struct t6_stream {
 struct t6_cursor_state {
 	bool uploaded;		/* the chip holds the current shape */
 	bool visible;
+	u8 slot;		/* shape slot being shown (double-buffered) */
 };
 
 struct t6_head {

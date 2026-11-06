@@ -51,7 +51,7 @@ of this repository.
 
 ```sh
 sudo apt update
-sudo apt install build-essential dkms linux-headers-$(uname -r)
+sudo apt install build-essential dkms # linux-headers-$(uname -r)
 make clean && sudo mkdir -p /usr/src/mct-t6-0.1.0
 sudo cp -r dkms.conf src /usr/src/mct-t6-0.1.0/
 sudo dkms install mct-t6/0.1.0

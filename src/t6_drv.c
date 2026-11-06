@@ -43,6 +43,11 @@ bool t6_param_hw_cursor = true;
 module_param_named(hw_cursor, t6_param_hw_cursor, bool, 0444);
 MODULE_PARM_DESC(hw_cursor, "Use the chip's hardware cursor (default true)");
 
+int t6_param_trust_damage = -1;
+module_param_named(trust_damage, t6_param_trust_damage, int, 0644);
+MODULE_PARM_DESC(trust_damage,
+		 "Update only userspace's damage rectangles: 1 = always, 0 = never (compare whole frames), -1 = until a rectangle falls outside the framebuffer, as with X11 and a rotated output (default -1)");
+
 /* --- Device discovery --------------------------------------------------- */
 
 static int t6_read_timings(struct t6_head *head, unsigned int fallback_count)

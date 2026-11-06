@@ -23,7 +23,7 @@ jobs:
     name: Version check
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Files agree on the version (and the tag matches it)
         run: |
           if [ "$GITHUB_REF_TYPE" = tag ]; then
@@ -36,7 +36,7 @@ jobs:
     name: Host tests
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - run: sudo apt-get update && sudo apt-get install -y python3-pil python3-numpy
       - run: make check PYTHON="python3 -I"
 
@@ -94,7 +94,7 @@ jobs:
           echo "KVER=$kver" >> "$GITHUB_ENV"
           echo "Building for kernel $kver"
 
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Build (W=1, warnings are errors)
         run: |
@@ -119,7 +119,7 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Source tarball
         run: |
           make dist

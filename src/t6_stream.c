@@ -460,6 +460,39 @@ unlock:
 	mutex_unlock(&s->lock);
 }
 
+/*
+ * Like t6_stream_update() for the whole visible area, but copies and marks
+ * dirty only the lines whose pixels changed.  For when the damage clips can't
+ * be trusted (see t6_damage_trusted()).
+ */
+void t6_stream_update_changed(struct t6_head *head, const void *src,
+			      unsigned int src_pitch)
+{
+	struct t6_stream *s = &head->stream;
+	unsigned int y, pitch;
+	bool changed = false;
+
+	mutex_lock(&s->lock);
+	if (!s->active)
+		goto unlock;
+
+	pitch = s->width * 4;
+	for (y = 0; y < s->height; y++) {
+		u8 *dst = s->shadow + (size_t)y * pitch;
+		const void *line = src + (size_t)y * src_pitch;
+
+		if (!memcmp(dst, line, pitch))
+			continue;
+		memcpy(dst, line, pitch);
+		__set_bit(y / T6_JPEG_MCU, s->dirty);
+		changed = true;
+	}
+	if (changed)
+		mod_delayed_work(head->t6->wq, &s->work, 0);
+unlock:
+	mutex_unlock(&s->lock);
+}
+
 void t6_stream_fini(struct t6_head *head)
 {
 	t6_stream_stop(head);

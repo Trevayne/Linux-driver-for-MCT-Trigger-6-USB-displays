@@ -49,6 +49,7 @@ struct t6_head;
 extern unsigned int t6_param_quality;
 extern unsigned int t6_param_encode_jobs;
 extern bool t6_param_hw_cursor;
+extern int t6_param_trust_damage;
 
 struct t6_stats {
 	u64 frames;
@@ -131,6 +132,7 @@ struct t6_head {
 	struct t6_vram_layout vram;
 	struct t6_stream stream;
 	struct t6_cursor_state cursor_state;
+	bool damage_untrusted;		/* compare frames until the next mode set */
 };
 
 struct t6_device {
@@ -211,6 +213,8 @@ int t6_stream_start(struct t6_head *head, unsigned int width,
 void t6_stream_stop(struct t6_head *head);
 void t6_stream_update(struct t6_head *head, const void *src,
 		      unsigned int src_pitch, const struct drm_rect *clip);
+void t6_stream_update_changed(struct t6_head *head, const void *src,
+			      unsigned int src_pitch);
 void t6_stream_fini(struct t6_head *head);
 
 #endif /* T6_DRV_H */

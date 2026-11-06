@@ -142,5 +142,19 @@ Notes from the 2026-11-06 install (installed system, not a live USB):
   claims the same `usb:v0711p5601` alias and had
   `/etc/modprobe.d/trigger6.conf`. It was removed so `mct_t6` owns the dock.
   The README now says to remove other Trigger 6 drivers first.
+- With the dock's monitor rotated to portrait under KDE on X11 (`xrandr
+  --rotate right`), only a 1080x1080 square updated; the rest stayed black
+  while the hardware cursor kept working. Landscape was fine. X's modesetting
+  driver sends damage for rotated PRIME outputs in the unrotated layout
+  (1080x1920 clips on a 1920x1080 framebuffer), and the core passes such clips
+  through (its bounds check compares pixel clips against 16.16 sizes). Fixed
+  with `trust_damage`: a clip outside the framebuffer switches the head to
+  frame comparison until the next mode set. Confirmed on hardware with the
+  default (`-1`): `normal`, `left`, `inverted` and `right` all update the
+  whole screen. `left` and `right` trigger the fallback (`damage clip
+  0,0-1080,1920 is outside the 1920x1080 framebuffer`). `normal` and
+  `inverted` keep using damage clips, and small updates in a corner
+  (typing, hover) show correctly in `inverted`, so X's clips are right
+  for 180°.
 - Not yet run on this machine: fbcon/modetest (step 5), hot-plug (7),
   throughput (8), suspend/resume (10).

@@ -129,6 +129,10 @@ Live-USB gotchas:
   (`t6emu`), DRM client (`t6drm`), `verify.py`.
 - `tools/build-matrix.sh`: compile test across kernel trees (`W=1`, sparse).
 - `tools/fedora-live-setup.sh`: prepare a Fedora (live) session for hardware work.
+- `tools/release.sh` (via `make version`, `make release-check`, `make release
+  RELEASE=x.y.z`, `make dist`): versioning and tagging. The version lives in
+  `dkms.conf`. `make release` commits and tags, so only the user runs it.
+  `.github/workflows/release.yml` builds on tag push and publishes the release.
 - `docs/research/` + `tools/research/`: raw protocol research (decoded Windows
   captures, prior-driver analysis) and the stdlib-Python pcapng/usbmon parsers
   that produced it. These also work on Linux usbmon captures, for diffing our

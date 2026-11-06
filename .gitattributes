@@ -1,0 +1,6 @@
+# Development-only files left out of `make dist` / release tarballs.
+/.claude        export-ignore
+/.github        export-ignore
+/.gitattributes export-ignore
+/CLAUDE.md      export-ignore
+/hw-logs        export-ignore

@@ -1,0 +1,132 @@
+# SPDX-License-Identifier: GPL-2.0-only
+# Copyright (C) 2026 Gareth Palmer
+#
+# Release build, started by pushing a version tag (`make release RELEASE=x.y.z`
+# creates one).  Checks the tag matches the version in dkms.conf, runs the host
+# tests, builds the module with DKMS on Debian, Ubuntu, Fedora and Arch, then
+# publishes a GitHub release with the source tarball.
+#
+# It can also be run by hand from the Actions tab (workflow_dispatch) to test
+# a branch; that run builds everything but does not publish a release.
+name: release
+
+on:
+  push:
+    tags: ['v*.*.*']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  version:
+    name: Version check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Files agree on the version (and the tag matches it)
+        run: |
+          if [ "$GITHUB_REF_TYPE" = tag ]; then
+            tools/release.sh check "$GITHUB_REF_NAME"
+          else
+            tools/release.sh check
+          fi
+
+  host-tests:
+    name: Host tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: sudo apt-get update && sudo apt-get install -y python3-pil python3-numpy
+      - run: make check PYTHON="python3 -I"
+
+  build:
+    name: DKMS build (${{ matrix.distro }})
+    runs-on: ubuntu-latest
+    needs: version
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - distro: debian
+            image: debian:stable
+          - distro: ubuntu
+            image: ubuntu:24.04
+          - distro: fedora
+            image: fedora:latest
+          - distro: arch
+            image: archlinux:latest
+    container: ${{ matrix.image }}
+    steps:
+      # The distro's own toolchain, DKMS and its current kernel headers, as
+      # docs/INSTALL.md installs them.  A container has no running kernel of
+      # its own, so build for whichever kernel the headers are for.
+      - name: Install build dependencies
+        run: |
+          case ${{ matrix.distro }} in
+          debian)
+            apt-get update
+            DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+              build-essential dkms linux-headers-amd64
+            kver=$(ls /usr/src | sed -n 's/^linux-headers-\(.*-amd64\)$/\1/p' | sort -V | tail -n1)
+            ;;
+          ubuntu)
+            apt-get update
+            DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+              build-essential dkms linux-headers-generic
+            kver=$(ls /usr/src | sed -n 's/^linux-headers-\(.*-generic\)$/\1/p' | sort -V | tail -n1)
+            ;;
+          fedora)
+            dnf install -y gcc make elfutils-libelf-devel dkms kernel-devel
+            kver=$(ls /usr/src/kernels | sort -V | tail -n1)
+            # kernel-core normally provides this link; it isn't installed here.
+            mkdir -p /lib/modules/$kver
+            [ -e /lib/modules/$kver/build ] ||
+              ln -s /usr/src/kernels/$kver /lib/modules/$kver/build
+            ;;
+          arch)
+            pacman -Syu --noconfirm --needed base-devel dkms linux-headers
+            kver=$(ls /usr/lib/modules | sort -V | tail -n1)
+            ;;
+          esac
+          [ -n "$kver" ] && [ -d /lib/modules/$kver/build ] ||
+            { echo "no kernel headers found" >&2; exit 1; }
+          echo "KVER=$kver" >> "$GITHUB_ENV"
+          echo "Building for kernel $kver"
+
+      - uses: actions/checkout@v4
+
+      - name: Build (W=1, warnings are errors)
+        run: |
+          make KDIR=/lib/modules/$KVER/build W=1 KCFLAGS=-Werror
+          make KDIR=/lib/modules/$KVER/build clean
+
+      - name: DKMS install
+        run: |
+          ver=$(tools/release.sh version)
+          mkdir -p /usr/src/mct-t6-$ver
+          cp -r dkms.conf src /usr/src/mct-t6-$ver/
+          dkms add mct-t6/$ver
+          dkms build mct-t6/$ver -k "$KVER" ||
+            { cat /var/lib/dkms/mct-t6/$ver/build/make.log; exit 1; }
+          dkms status
+
+  release:
+    name: Publish release
+    if: github.ref_type == 'tag'
+    needs: [version, host-tests, build]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Source tarball
+        run: |
+          make dist
+          sha256sum mct-t6-*.tar.gz > SHA256SUMS
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" mct-t6-*.tar.gz SHA256SUMS \
+            --title "mct_t6 $GITHUB_REF_NAME" --generate-notes --verify-tag

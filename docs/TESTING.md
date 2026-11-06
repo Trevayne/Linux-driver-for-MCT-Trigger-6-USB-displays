@@ -123,3 +123,24 @@ Things that only hardware can confirm, in rough order of risk:
   `bcdUSB 2.00`);
 - real throughput on this laptop's USB 2.0 link (single-frame numbers so far:
   about 250 KB per 1080p frame at q85, about 7 ms to send).
+
+## Tested setups
+
+| Date | Machine | Distro, kernel, desktop | Dock | Secure Boot | Result |
+|---|---|---|---|---|---|
+| 2026-10-14 | Lenovo 82QD | Fedora 44 KDE live USB, 6.19.10 | j5create HDMI+VGA, 2 outputs, USB 2.0 (480M) | off | Both outputs, JPEG stream, fences, hot-plug, hardware cursor. See `.claude/skills/hardware-bringup/machines.md`. |
+| 2026-11-06 | Lenovo IdeaPad 1 14IAU7 (82QC) | Ubuntu 24.04.5, 7.0.0-31-generic, KDE on X11 | `0711:5601`, 1 output (HDMI), firmware `0x24030502`, USB 2.0 (480M) | **on** | DKMS install with the module signed by Ubuntu's DKMS key; HDMI `connected`, 1920x1080, desktop picture. Checklist steps 1–4 and 6 only. |
+
+Notes from the 2026-11-06 install (installed system, not a live USB):
+
+- `dkms install` succeeded, but the module never loaded. The DKMS key
+  `/var/lib/shim-signed/mok/MOK.der` was not enrolled
+  (`mokutil --test-key` said so), so the lockdown kernel refused the module.
+  Enrolling it with `mokutil --import` and the MOK screen at reboot fixed this.
+  The README's Ubuntu steps now include this.
+- A third-party `trigger6` DKMS driver (1.2.0-beta1) was also installed. It
+  claims the same `usb:v0711p5601` alias and had
+  `/etc/modprobe.d/trigger6.conf`. It was removed so `mct_t6` owns the dock.
+  The README now says to remove other Trigger 6 drivers first.
+- Not yet run on this machine: fbcon/modetest (step 5), hot-plug (7),
+  throughput (8), suspend/resume (10).

@@ -53,9 +53,9 @@ of this repository.
 ```sh
 sudo apt update
 sudo apt install build-essential dkms # linux-headers-$(uname -r)
-make clean && sudo mkdir -p /usr/src/mct-t6-0.2.0
-sudo cp -r dkms.conf src /usr/src/mct-t6-0.2.0/
-sudo dkms install mct-t6/0.2.0
+make clean && sudo mkdir -p /usr/src/mct-t6-0.2.1
+sudo cp -r dkms.conf src /usr/src/mct-t6-0.2.1/
+sudo dkms install mct-t6/0.2.1
 ```
 
 If Secure Boot is on (`mokutil --sb-state`), enroll Ubuntu's DKMS signing key
@@ -74,9 +74,9 @@ kernel is too old.
 
 ```sh
 sudo dnf install gcc make elfutils-libelf-devel dkms kernel-devel-$(uname -r)
-make clean && sudo mkdir -p /usr/src/mct-t6-0.2.0
-sudo cp -r dkms.conf src /usr/src/mct-t6-0.2.0/
-sudo dkms install mct-t6/0.2.0
+make clean && sudo mkdir -p /usr/src/mct-t6-0.2.1
+sudo cp -r dkms.conf src /usr/src/mct-t6-0.2.1/
+sudo dkms install mct-t6/0.2.1
 ```
 
 **Arch** (and Manjaro, EndeavourOS, …), as a pacman package:

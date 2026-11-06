@@ -52,9 +52,9 @@ of this repository.
 ```sh
 sudo apt update
 sudo apt install build-essential dkms # linux-headers-$(uname -r)
-make clean && sudo mkdir -p /usr/src/mct-t6-0.1.0
-sudo cp -r dkms.conf src /usr/src/mct-t6-0.1.0/
-sudo dkms install mct-t6/0.1.0
+make clean && sudo mkdir -p /usr/src/mct-t6-0.1.1
+sudo cp -r dkms.conf src /usr/src/mct-t6-0.1.1/
+sudo dkms install mct-t6/0.1.1
 ```
 
 Ubuntu 22.04 needs the HWE kernel (`linux-generic-hwe-22.04`); its stock 5.15
@@ -64,9 +64,9 @@ kernel is too old.
 
 ```sh
 sudo dnf install gcc make elfutils-libelf-devel dkms kernel-devel-$(uname -r)
-make clean && sudo mkdir -p /usr/src/mct-t6-0.1.0
-sudo cp -r dkms.conf src /usr/src/mct-t6-0.1.0/
-sudo dkms install mct-t6/0.1.0
+make clean && sudo mkdir -p /usr/src/mct-t6-0.1.1
+sudo cp -r dkms.conf src /usr/src/mct-t6-0.1.1/
+sudo dkms install mct-t6/0.1.1
 ```
 
 **Arch** (and Manjaro, EndeavourOS, …), as a pacman package:

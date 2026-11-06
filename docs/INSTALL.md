@@ -50,9 +50,9 @@ kernel is older than the newest one in the repositories. Run
 
 ```sh
 make clean                                # don't ship objects from a manual build
-sudo mkdir -p /usr/src/mct-t6-0.1.0
-sudo cp -r dkms.conf src /usr/src/mct-t6-0.1.0/
-sudo dkms install mct-t6/0.1.0
+sudo mkdir -p /usr/src/mct-t6-0.1.1
+sudo cp -r dkms.conf src /usr/src/mct-t6-0.1.1/
+sudo dkms install mct-t6/0.1.1
 ```
 
 With Secure Boot on, Fedora's DKMS signs the module with its own key,
@@ -106,9 +106,9 @@ Ubuntu 22.04's original 5.15 kernel is **too old**. Install the HWE kernel
 
 ```sh
 make clean
-sudo mkdir -p /usr/src/mct-t6-0.1.0
-sudo cp -r dkms.conf src /usr/src/mct-t6-0.1.0/
-sudo dkms install mct-t6/0.1.0
+sudo mkdir -p /usr/src/mct-t6-0.1.1
+sudo cp -r dkms.conf src /usr/src/mct-t6-0.1.1/
+sudo dkms install mct-t6/0.1.1
 ```
 
 With Secure Boot on, DKMS signs the module:
@@ -264,12 +264,12 @@ sudo insmod src/mct_t6.ko
 **DKMS:**
 
 ```sh
-sudo dkms remove mct-t6/0.1.0 --all
-sudo rm -rf /usr/src/mct-t6-0.1.0
+sudo dkms remove mct-t6/0.1.1 --all
+sudo rm -rf /usr/src/mct-t6-0.1.1
 make clean
-sudo mkdir -p /usr/src/mct-t6-0.1.0
-sudo cp -r dkms.conf src /usr/src/mct-t6-0.1.0/
-sudo dkms install mct-t6/0.1.0
+sudo mkdir -p /usr/src/mct-t6-0.1.1
+sudo cp -r dkms.conf src /usr/src/mct-t6-0.1.1/
+sudo dkms install mct-t6/0.1.1
 ```
 
 Then unplug the dock, run `sudo modprobe -r mct_t6`, and plug it back in. On
@@ -278,7 +278,7 @@ Arch, run `makepkg -si` again instead.
 ## Uninstalling
 
 ```sh
-sudo dkms remove mct-t6/0.1.0 --all && sudo rm -rf /usr/src/mct-t6-0.1.0
+sudo dkms remove mct-t6/0.1.1 --all && sudo rm -rf /usr/src/mct-t6-0.1.1
 # or, on Arch:
 sudo pacman -R mct-t6-dkms
 ```

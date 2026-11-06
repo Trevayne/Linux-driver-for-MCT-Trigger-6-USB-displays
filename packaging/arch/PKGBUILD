@@ -4,7 +4,7 @@
 #
 # Build from a checkout:  cd packaging/arch && makepkg -si
 pkgname=mct-t6-dkms
-pkgver=0.1.0
+pkgver=0.1.1
 pkgrel=1
 pkgdesc="DRM driver for MCT Trigger 6 USB display adapters and docks (DKMS)"
 arch=('any')

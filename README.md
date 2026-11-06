@@ -43,14 +43,42 @@ There are no runtime dependencies: no daemon, no userspace libraries.
 
 Full instructions for **Fedora**, **Debian / Ubuntu** and **Arch**, with DKMS
 or a manual build, plus Secure Boot, updating and troubleshooting, are in
-**[docs/INSTALL.md](docs/INSTALL.md)**. In short, on Fedora:
+**[docs/INSTALL.md](docs/INSTALL.md)**. The quick versions below install with
+DKMS, so the module is rebuilt for every new kernel. Run them from a checkout
+of this repository.
+
+**Debian / Ubuntu** (and Mint, Pop!_OS, …):
 
 ```sh
-sudo dnf install gcc make dkms kernel-devel-$(uname -r)
+sudo apt update
+sudo apt install build-essential dkms linux-headers-$(uname -r)
 make clean && sudo mkdir -p /usr/src/mct-t6-0.1.0
 sudo cp -r dkms.conf src /usr/src/mct-t6-0.1.0/
 sudo dkms install mct-t6/0.1.0
 ```
+
+Ubuntu 22.04 needs the HWE kernel (`linux-generic-hwe-22.04`); its stock 5.15
+kernel is too old.
+
+**Fedora** (and RHEL, Alma, Nobara, …):
+
+```sh
+sudo dnf install gcc make elfutils-libelf-devel dkms kernel-devel-$(uname -r)
+make clean && sudo mkdir -p /usr/src/mct-t6-0.1.0
+sudo cp -r dkms.conf src /usr/src/mct-t6-0.1.0/
+sudo dkms install mct-t6/0.1.0
+```
+
+**Arch** (and Manjaro, EndeavourOS, …), as a pacman package:
+
+```sh
+sudo pacman -S --needed base-devel dkms linux-headers   # or linux-lts-headers, linux-zen-headers, …
+make clean
+cd packaging/arch && makepkg -si
+```
+
+With Secure Boot on, the module must be signed with an enrolled key or it
+won't load; see [Secure Boot](docs/INSTALL.md#secure-boot).
 
 Then plug in the dock. The module loads automatically through its USB device
 table, and the outputs show up in your display settings.
@@ -88,6 +116,22 @@ tests/e2e/run.sh                         # full driver vs. emulated chip under U
 
 See [docs/TESTING.md](docs/TESTING.md) for all test layers, and
 [docs/DESIGN.md](docs/DESIGN.md) for the architecture.
+
+### Releasing
+
+The version lives in `dkms.conf`; `packaging/arch/PKGBUILD` and the install
+commands in the docs must match it (`make release-check` verifies this).
+
+```sh
+make release RELEASE=0.2.0          # bump the version everywhere, commit, tag v0.2.0
+git push --atomic origin main v0.2.0
+```
+
+Pushing a `v*.*.*` tag runs `.github/workflows/release.yml`: it checks the tag
+matches `dkms.conf`, runs the host tests, builds the module with DKMS on
+Debian, Ubuntu, Fedora and Arch, and publishes a GitHub release with the
+source tarball (`make dist`). The workflow can also be started by hand from
+the Actions tab to test a branch; that run doesn't publish anything.
 
 ## Limitations and roadmap
 

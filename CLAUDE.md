@@ -102,6 +102,10 @@ Live-USB gotchas:
   connector `mode_valid` 6.15, `usb_driver.shutdown` 6.11, fbdev setup
   variants 6.2/6.11/6.13/6.14, **`drm_atomic_state` renamed to
   `drm_atomic_commit` in 7.2** (handled with a `#define` in t6_compat.h).
+- Ubuntu kernels build with `CONFIG_FRAME_WARN=1024` (and CI uses
+  `-Werror`); keep every function's stack frame under 1 KiB. The JPEG
+  encoder stages luma in the caller's s16 output for this reason.
+  `tools/build-matrix.sh` passes `-Wframe-larger-than=1024`.
 - sparse 0.6.4 can't parse `__has_include`. Use LINUX_VERSION_CODE checks in
   t6_compat.h.
 - `shadow_plane_state->data[0]` already includes `fb->offsets[0]`. Don't add

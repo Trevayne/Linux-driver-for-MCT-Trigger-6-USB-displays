@@ -32,8 +32,11 @@ for kdir in "$@"; do
 	modpost=
 	[ -f "$kdir/Module.symvers" ] || modpost=KBUILD_MODPOST_WARN=1
 
+	# Distro kernels (Ubuntu, for one) build with CONFIG_FRAME_WARN=1024;
+	# our trees may allow more, so enforce the stricter limit here.
 	log="$work/build.log"
 	if make -C "$kdir" M="$src" W=1 $check $modpost \
+		KCFLAGS=-Wframe-larger-than=1024 \
 		CONFIG_MCT_T6_KUNIT_TEST=m modules >"$log" 2>&1; then
 		diags=$(grep -E 'warning|error' "$log" |
 			grep -vE 'modpost: .* undefined!|unresolved symbol|Module.symvers|You may get|KBUILD_MODPOST_WARN' || true)

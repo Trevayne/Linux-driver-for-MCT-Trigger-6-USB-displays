@@ -241,24 +241,30 @@ static void bw_flush(struct bitwriter *w)
 /*
  * Convert one 16x16 MCU to level-shifted YCbCr samples (JFIF / BT.601 full
  * range, 16.16 fixed point).  Chroma is subsampled by averaging 2x2 pixels;
- * because the conversion is linear this is done on summed RGB.
+ * because the conversion is linear, each pixel's weighted RGB is summed and
+ * the 2x2 sum is scaled and rounded once at the end.
  *
- * blocks[0..3] are the Y blocks (top-left, top-right, bottom-left,
- * bottom-right), blocks[4] is Cb and blocks[5] is Cr; natural order.
+ * Y goes into @y[0..3] (top-left, top-right, bottom-left, bottom-right) as
+ * s16 (it fits in -128..127), Cb and Cr into @cb and @cr; natural order.
+ * Kept this small because kernel builds warn above 1024 bytes of stack.
  */
 static void load_mcu(const u8 *pixels, unsigned int pitch, unsigned int width,
 		     unsigned int height, unsigned int mx, unsigned int my,
-		     s32 blocks[T6_JPEG_BLOCKS_PER_MCU][64])
+		     s16 y[4][64], s32 cb[64], s32 cr[64])
 {
 	unsigned int x0 = mx * T6_JPEG_MCU, y0 = my * T6_JPEG_MCU;
-	s32 sum_r[8][8] = { { 0 } }, sum_g[8][8] = { { 0 } };
-	s32 sum_b[8][8] = { { 0 } };
-	unsigned int yy, xx;
+	unsigned int yy, xx, k;
+
+	for (k = 0; k < 64; k++) {
+		cb[k] = 0;
+		cr[k] = 0;
+	}
 
 	for (yy = 0; yy < T6_JPEG_MCU; yy++) {
 		const u8 *line = pixels +
 				 (size_t)min(y0 + yy, height - 1) * pitch;
-		s32 *yblk = blocks[(yy >> 3) * 2] + (yy & 7) * 8;
+		s16 *yblk = y[(yy >> 3) * 2] + (yy & 7) * 8;
+		unsigned int c = (yy >> 1) * 8;
 
 		for (xx = 0; xx < T6_JPEG_MCU; xx++) {
 			const u8 *px = line + min(x0 + xx, width - 1) * 4;
@@ -266,23 +272,15 @@ static void load_mcu(const u8 *pixels, unsigned int pitch, unsigned int width,
 
 			yblk[(xx >> 3) * 64 + (xx & 7)] =
 				((19595 * r + 38470 * g + 7471 * b + 32768) >> 16) - 128;
-			sum_r[yy >> 1][xx >> 1] += r;
-			sum_g[yy >> 1][xx >> 1] += g;
-			sum_b[yy >> 1][xx >> 1] += b;
+			cb[c + (xx >> 1)] += -11059 * r - 21709 * g + 32768 * b;
+			cr[c + (xx >> 1)] += 32768 * r - 27439 * g - 5329 * b;
 		}
 	}
 
-	for (yy = 0; yy < 8; yy++) {
-		for (xx = 0; xx < 8; xx++) {
-			s32 r = sum_r[yy][xx], g = sum_g[yy][xx];
-			s32 b = sum_b[yy][xx];
-
-			/* Sums are 4x the average, hence the extra >> 2. */
-			blocks[4][yy * 8 + xx] =
-				(-11059 * r - 21709 * g + 32768 * b + (1 << 17)) >> 18;
-			blocks[5][yy * 8 + xx] =
-				(32768 * r - 27439 * g - 5329 * b + (1 << 17)) >> 18;
-		}
+	/* Sums are 4x the average, hence the extra >> 2. */
+	for (k = 0; k < 64; k++) {
+		cb[k] = (cb[k] + (1 << 17)) >> 18;
+		cr[k] = (cr[k] + (1 << 17)) >> 18;
 	}
 }
 
@@ -395,12 +393,18 @@ static void transform_mcu(const struct t6_jpeg_enc *enc, const u8 *pixels,
 			  unsigned int my,
 			  s16 out[T6_JPEG_BLOCKS_PER_MCU][64])
 {
-	s32 blocks[T6_JPEG_BLOCKS_PER_MCU][64];
-	unsigned int b;
+	s32 cb[64], cr[64], data[64];
+	unsigned int b, k;
 
-	load_mcu(pixels, pitch, width, height, mx, my, blocks);
-	for (b = 0; b < T6_JPEG_BLOCKS_PER_MCU; b++)
-		transform_block(enc, b < 4 ? 0 : 1, blocks[b], out[b]);
+	/* Luma is staged in @out[0..3] and transformed through @data. */
+	load_mcu(pixels, pitch, width, height, mx, my, out, cb, cr);
+	for (b = 0; b < 4; b++) {
+		for (k = 0; k < 64; k++)
+			data[k] = out[b][k];
+		transform_block(enc, 0, data, out[b]);
+	}
+	transform_block(enc, 1, cb, out[4]);
+	transform_block(enc, 1, cr, out[5]);
 }
 
 /* --- Entropy coding ----------------------------------------------------- */

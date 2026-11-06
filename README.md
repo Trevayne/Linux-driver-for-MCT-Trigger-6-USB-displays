@@ -14,8 +14,9 @@ cursor and a text console all work through the standard interfaces.
 > 6.1 through 7.2 and passes its host tests, KUnit, and an end-to-end test
 > against an emulated chip under KASAN and lockdep. On a real j5create HDMI+VGA
 > dock (Fedora 44, kernel 6.19, KDE), both outputs, the JPEG stream and dock
-> hot-plug and the hardware cursor work. See
-> [docs/TESTING.md](docs/TESTING.md) for the bring-up checklist.
+> hot-plug and the hardware cursor work. It also installs and drives the dock
+> on Ubuntu with kernel 7.0 and Secure Boot on, via DKMS and an enrolled MOK
+> key. See [docs/TESTING.md](docs/TESTING.md) for the bring-up checklist.
 
 ## How it works
 
@@ -57,6 +58,15 @@ sudo cp -r dkms.conf src /usr/src/mct-t6-0.1.1/
 sudo dkms install mct-t6/0.1.1
 ```
 
+If Secure Boot is on (`mokutil --sb-state`), enroll Ubuntu's DKMS signing key
+once, or the module builds but never loads:
+
+```sh
+mokutil --test-key /var/lib/shim-signed/mok/MOK.der   # "is not enrolled"? then:
+sudo mokutil --import /var/lib/shim-signed/mok/MOK.der  # set a one-time password
+sudo reboot   # blue MOK screen: Enroll MOK → Continue → Yes → password → Reboot
+```
+
 Ubuntu 22.04 needs the HWE kernel (`linux-generic-hwe-22.04`); its stock 5.15
 kernel is too old.
 
@@ -80,6 +90,15 @@ cd packaging/arch && makepkg -si
 With Secure Boot on, the module must be signed with an enrolled key or it
 won't load; see [Secure Boot](docs/INSTALL.md#secure-boot).
 
+Only one driver can own the dock. If you previously installed another
+Trigger 6 driver (for example a DKMS `trigger6` module), remove it first:
+
+```sh
+dkms status                                   # look for trigger6 or similar
+sudo dkms remove trigger6/<version> --all
+sudo rm -f /etc/modprobe.d/trigger6.conf
+```
+
 Then plug in the dock. The module loads automatically through its USB device
 table, and the outputs show up in your display settings.
 
@@ -96,6 +115,13 @@ Set them persistently in `/etc/modprobe.d/mct_t6.conf`, e.g.
 
 ## Troubleshooting
 
+- **Installed fine, but no display?** Check `lsmod | grep mct_t6`. If it's
+  missing and `mokutil --sb-state` says Secure Boot is enabled, the signing key
+  isn't enrolled: `dkms install` succeeds, but the kernel silently refuses the
+  module. Enroll the key as shown under [Installation](#installation).
+- If `lsmod` shows a different driver instead (e.g. `trigger6`), it claimed the
+  dock first. Remove it as shown under [Installation](#installation), then
+  replug the dock.
 - `dmesg | grep mct_t6` shows what the driver found: output count, VRAM, firmware
   version and link speed.
 - `/sys/kernel/debug/mct_t6-<usb-interface>/stats` (debugfs) shows per-output

@@ -266,6 +266,43 @@ static int t6_primary_atomic_check(struct drm_plane *plane,
 						   false, false);
 }
 
+/*
+ * Whether to send only the damage clips, or compare the whole frame instead.
+ *
+ * Correct userspace keeps clips inside the framebuffer, but the core only
+ * rejects clips that are wildly out of range.  X11's modesetting driver
+ * reports damage for a rotated PRIME output (e.g. a portrait monitor) in the
+ * unrotated layout: 1080x1920 clips on a 1920x1080 framebuffer.  Clipped to
+ * the plane, they leave part of the screen that never updates.  A clip
+ * outside the framebuffer is the tell: from then until the next mode set,
+ * compare frames instead.
+ */
+static bool t6_damage_trusted(struct t6_head *head,
+			      const struct drm_plane_state *state)
+{
+	const struct drm_mode_rect *clips = drm_plane_get_damage_clips(state);
+	unsigned int i, n = drm_plane_get_damage_clips_count(state);
+	const struct drm_framebuffer *fb = state->fb;
+
+	if (t6_param_trust_damage >= 0)
+		return t6_param_trust_damage;
+	if (head->damage_untrusted)
+		return false;
+
+	for (i = 0; i < n; i++) {
+		if (clips[i].x2 <= (int)fb->width &&
+		    clips[i].y2 <= (int)fb->height)
+			continue;
+		drm_info(head->crtc.dev,
+			 "head %u: damage clip %d,%d-%d,%d is outside the %ux%u framebuffer; comparing frames instead\n",
+			 head->index, clips[i].x1, clips[i].y1, clips[i].x2,
+			 clips[i].y2, fb->width, fb->height);
+		head->damage_untrusted = true;
+		return false;
+	}
+	return true;
+}
+
 static void t6_primary_atomic_update(struct drm_plane *plane,
 				     struct drm_atomic_state *state)
 {
@@ -294,12 +331,18 @@ static void t6_primary_atomic_update(struct drm_plane *plane,
 	vaddr = (const u8 *)shadow->data[0].vaddr +
 		src.y1 * fb->pitches[0] + src.x1 * fb->format->cpp[0];
 
+	if (!t6_damage_trusted(head, new)) {
+		t6_stream_update_changed(head, vaddr, fb->pitches[0]);
+		goto end_access;
+	}
+
 	drm_atomic_helper_damage_iter_init(&iter, old, new);
 	drm_atomic_for_each_plane_damage(&iter, &clip) {
 		drm_rect_translate(&clip, -src.x1, -src.y1);
 		t6_stream_update(head, vaddr, fb->pitches[0], &clip);
 	}
 
+end_access:
 	drm_gem_fb_end_cpu_access(fb, DMA_FROM_DEVICE);
 out:
 	drm_dev_exit(idx);
@@ -427,6 +470,8 @@ static void t6_crtc_atomic_enable(struct drm_crtc *crtc,
 	/* A mode set resets the chip's cursor; re-send it on next update. */
 	head->cursor_state.uploaded = false;
 	head->cursor_state.visible = false;
+	/* New mode, maybe new userspace: give its damage clips another chance. */
+	head->damage_untrusted = false;
 
 	ret = t6_head_set_mode(head, timing);
 	if (ret)

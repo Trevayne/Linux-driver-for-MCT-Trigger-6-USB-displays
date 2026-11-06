@@ -109,6 +109,7 @@ table, and the outputs show up in your display settings.
 | `jpeg_quality` | 85 | Maximum JPEG quality (30–100). Lowered automatically while the link is saturated, then raised again. |
 | `encode_jobs` | 0 | Parallel encoder jobs per frame; 0 = one per CPU (max 8). |
 | `hw_cursor` | true | Use the chip's hardware cursor. |
+| `trust_damage` | -1 | Send only the rectangles userspace reports as changed: `1` always, `0` never (compare whole frames, more CPU), `-1` until userspace reports a rectangle outside the framebuffer, then compare frames until the next mode set. |
 
 Set them persistently in `/etc/modprobe.d/mct_t6.conf`, e.g.
 `options mct_t6 jpeg_quality=90`.
@@ -127,6 +128,11 @@ Set them persistently in `/etc/modprobe.d/mct_t6.conf`, e.g.
 - `/sys/kernel/debug/mct_t6-<usb-interface>/stats` (debugfs) shows per-output
   statistics: frames, bytes, current JPEG quality, encode and send time, and
   dropped frames.
+- **Part of a rotated (portrait) monitor stays black on X11**, while the pointer
+  still moves over it: X11's modesetting driver reports changed areas in the
+  unrotated layout. The driver detects this and falls back to comparing frames
+  (`dmesg` says `comparing frames instead`). If an area still never updates,
+  set `options mct_t6 trust_damage=0`, or use a Wayland session.
 - A VGA monitor without working DDC can't be detected; force it on with the
   kernel parameter `video=VGA-1:e`.
 - If the link is USB 2.0, the log says `high-speed`. A SuperSpeed port gives far

@@ -119,6 +119,7 @@ void t6_bulk_hdr_encode(u32 payload_len, u32 addr, u8 out[T6_BULK_HDR_LEN]);
 #define T6_VIDEO_CMD_FLIP_PRIMARY	3	/* head 0 */
 #define T6_VIDEO_CMD_FLIP_SECONDARY	4	/* head 1 */
 #define T6_FORMAT_NV12			6
+#define T6_FORMAT_RGB24			9	/* 3 bytes per pixel, B,G,R */
 #define T6_FORMAT_JPEG			13
 #define T6_VIDEO_FLAG_RESET_JPEG	0x80
 
@@ -171,6 +172,37 @@ static inline u32 t6_nv12_uv_offset(unsigned int width, unsigned int height)
 }
 
 bool t6_mode_fits_vram(unsigned int width, unsigned int height);
+
+/* --- Raw (lossless) frames ---------------------------------------------- */
+
+/*
+ * A raw frame is one object: the 48-byte video header immediately followed by
+ * the pixels, written so that the pixels land on the framebuffer address
+ * (the Windows driver's layout).  The chip scans the RGB24 surface out
+ * directly; nothing is decoded.  Three such framebuffers are carved off the
+ * top of the head's JPEG ring, so both kinds of frame can be mixed.
+ */
+#define T6_RAW_FB_OFFSET		0x40	/* pixels, 64-byte aligned */
+#define T6_RAW_MIN_RING			(8 * SZ_1M)	/* left for JPEG */
+#define T6_RAW_MAX_OBJECT		(T6_VIDEO_HDR_LEN + 2048 * 1200 * 3)
+
+struct t6_raw_layout {
+	u32 fb[T6_FB_SLOTS];	/* pixel addresses; header at fb - 48 */
+};
+
+static inline u32 t6_raw_pitch(unsigned int width)
+{
+	return width * 3;
+}
+
+/**
+ * t6_raw_layout() - make room for raw frames of @width x @height
+ * @l: the head's JPEG layout; on success its ring is shortened
+ * @raw: output, the three raw framebuffers
+ * Return: 0, or -ENOSPC if the frames don't fit next to a usable ring.
+ */
+int t6_raw_layout(struct t6_vram_layout *l, unsigned int width,
+		  unsigned int height, struct t6_raw_layout *raw);
 
 /* Ring cursor and framebuffer rotation for one head. */
 struct t6_stream_pos {

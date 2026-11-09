@@ -584,6 +584,37 @@ static int bench(void)
 	return 0;
 }
 
+static void test_bgr24(void)
+{
+	/* Two lines of three pixels with a padded pitch. */
+	static const u8 src[2][16] = {
+		{ 1, 2, 3, 0xff, 4, 5, 6, 0xff, 7, 8, 9, 0xff, 0xee, 0xee },
+		{ 10, 11, 12, 0, 255, 255, 255, 0, 0, 0, 0, 0, 0xee, 0xee },
+	};
+	struct t6_jpeg_color cm = { 0 };
+	u8 out[18];
+	unsigned int i;
+
+	t6_color_bgr24(&src[0][0], 16, 3, 2, NULL, out);
+	for (i = 0; i < 9; i++)
+		CHECK(out[i] == i + 1, "bgr24 line 0 byte %u = %u", i, out[i]);
+	CHECK(out[9] == 10 && out[12] == 255 && out[17] == 0, "bgr24 line 1");
+
+	/* Inactive colour management is a plain copy. */
+	t6_color_bgr24(&src[0][0], 16, 3, 2, &cm, out);
+	CHECK(out[0] == 1 && out[8] == 9, "bgr24 identity colour");
+
+	/* An inverting LUT, applied per channel, keeps B,G,R order. */
+	cm.use_lut = true;
+	for (i = 0; i < T6_JPEG_LUT_SIZE; i++)
+		cm.lut[0][i] = cm.lut[1][i] = cm.lut[2][i] = 255 - i;
+	cm.lut[2][1] = 100;	/* blue channel only */
+	t6_color_bgr24(&src[0][0], 16, 3, 2, &cm, out);
+	CHECK(out[0] == 100 && out[1] == 253 && out[2] == 252,
+	      "bgr24 LUT %u %u %u", out[0], out[1], out[2]);
+	CHECK(out[12] == 0 && out[15] == 255, "bgr24 LUT line 1");
+}
+
 int main(int argc, char **argv)
 {
 	if (argc == 2 && !strcmp(argv[1], "--bench"))
@@ -599,6 +630,7 @@ int main(int argc, char **argv)
 	test_incremental();
 	test_overflow();
 	test_color();
+	test_bgr24();
 
 	if (failures) {
 		fprintf(stderr, "test_jpeg: %d failure(s)\n", failures);

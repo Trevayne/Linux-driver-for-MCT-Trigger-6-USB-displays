@@ -305,6 +305,37 @@ static inline void apply_color(const struct t6_jpeg_color *cm,
 	}
 }
 
+void t6_color_bgr24(const u8 *src, unsigned int pitch, unsigned int width,
+		    unsigned int lines, const struct t6_jpeg_color *color,
+		    u8 *dst)
+{
+	unsigned int x, y;
+
+	if (color && !color->use_ctm && !color->use_lut)
+		color = NULL;
+
+	for (y = 0; y < lines; y++) {
+		const u8 *p = src + (size_t)y * pitch;
+
+		if (!color) {
+			for (x = 0; x < width; x++, p += 4, dst += 3) {
+				dst[0] = p[0];
+				dst[1] = p[1];
+				dst[2] = p[2];
+			}
+			continue;
+		}
+		for (x = 0; x < width; x++, p += 4, dst += 3) {
+			s32 b = p[0], g = p[1], r = p[2];
+
+			apply_color(color, &r, &g, &b);
+			dst[0] = b;
+			dst[1] = g;
+			dst[2] = r;
+		}
+	}
+}
+
 /*
  * Convert one 16x16 MCU to level-shifted YCbCr samples (JFIF / BT.601 full
  * range, 16.16 fixed point).  Chroma is subsampled by averaging 2x2 pixels;

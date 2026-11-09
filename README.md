@@ -109,6 +109,9 @@ table, and the outputs show up in your display settings.
 | `jpeg_quality` | 85 | Maximum JPEG quality (30–100). Lowered automatically while the link is saturated, then raised again. |
 | `encode_jobs` | 0 | Parallel encoder jobs per frame; 0 = one per CPU (max 8). |
 | `hw_cursor` | true | Use the chip's hardware cursor. |
+| `lossless` | -1 | Once the screen has been still for `lossless_delay_ms`, resend it as a lossless raw RGB frame, which makes text pixel-exact: `1` on any link, `0` never (JPEG only), `-1` on SuperSpeed (USB 3) links. |
+| `lossless_delay_ms` | 100 | Quiet time before the lossless frame. Updates closer together than this (scrolling, video) stay JPEG. |
+| `lossless_always` | false | Wherever `lossless` applies, send every frame lossless and never JPEG. Best picture; motion drops to about 25 fps at 1080p. |
 | `trust_damage` | -1 | Send only the rectangles userspace reports as changed: `1` always, `0` never (compare whole frames, more CPU), `-1` until userspace reports a rectangle outside the framebuffer, then compare frames until the next mode set. |
 
 Set them persistently in `/etc/modprobe.d/mct_t6.conf`, e.g.

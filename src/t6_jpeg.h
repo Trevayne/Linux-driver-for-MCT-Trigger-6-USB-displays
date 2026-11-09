@@ -211,4 +211,15 @@ long t6_jpeg_assemble(const struct t6_jpeg_enc *enc, unsigned int width,
 		      unsigned int height, const struct t6_jpeg_row *rows,
 		      u8 *out, size_t cap);
 
+/**
+ * t6_color_bgr24() - convert XRGB8888 lines to packed B,G,R for raw frames
+ * @src:   first pixel, XRGB8888 little-endian (B,G,R,X)
+ * @pitch: bytes between source lines
+ * @dst:   output, @width * 3 bytes per line, lines packed
+ * @color: colour management to apply, exactly as the encoder does, or NULL
+ */
+void t6_color_bgr24(const u8 *src, unsigned int pitch, unsigned int width,
+		    unsigned int lines, const struct t6_jpeg_color *color,
+		    u8 *dst);
+
 #endif /* T6_JPEG_H */

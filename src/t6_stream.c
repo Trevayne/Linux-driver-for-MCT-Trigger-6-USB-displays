@@ -23,9 +23,18 @@
  * Quality adapts to the link: frames persistently over the per-frame byte
  * budget lower the JPEG quality, persistently small frames raise it back
  * towards the configured maximum.
+ *
+ * Lossless refinement (by default on SuperSpeed links): JPEG's 4:2:0 colour
+ * and quantisation blur fine text, so once the picture has been still for
+ * lossless_delay_ms the worker sends the whole frame again as raw RGB24,
+ * which the chip scans out untouched.  An update arriving after such a
+ * quiet spell goes out raw straight away; rapid updates (scrolling, video)
+ * stay JPEG, which is an order of magnitude smaller.  With lossless_always
+ * every frame is raw, trading frame rate for picture quality.
  */
 #include <linux/bitmap.h>
 #include <linux/cpumask.h>
+#include <linux/jiffies.h>
 #include <linux/ktime.h>
 #include <linux/slab.h>
 #include <linux/vmalloc.h>
@@ -47,6 +56,9 @@
 
 #define T6_QUALITY_MIN	30
 #define T6_QUALITY_STEP	5
+
+/* Raw frames that fail in a row before lossless mode is given up. */
+#define T6_RAW_MAX_FAILURES	3
 
 /* Consecutive frames over/under budget before quality changes. */
 #define T6_OVER_BUDGET_FRAMES	3
@@ -206,7 +218,7 @@ static int t6_send_frame(struct t6_stream *s, unsigned int jpeg_len)
 
 	memset(s->frame + T6_VIDEO_HDR_LEN + jpeg_len, 0, T6_JPEG_PAD);
 
-	ret = t6_stream_place(&head->vram, &s->pos, total, &ring_addr,
+	ret = t6_stream_place(&s->vram, &s->pos, total, &ring_addr,
 			      &fb_addr, &reset);
 	if (ret)
 		return ret;
@@ -228,6 +240,7 @@ static int t6_send_frame(struct t6_stream *s, unsigned int jpeg_len)
 	t6_flip_encode(&flip, s->frame);
 
 	t0 = ktime_get_ns();
+	s->last_frame_ns = t0;
 	ret = t6_send_object(t6, ring_addr, s->frame, total);
 	s->stats.send_ns += ktime_get_ns() - t0;
 
@@ -242,21 +255,95 @@ static int t6_send_frame(struct t6_stream *s, unsigned int jpeg_len)
 	return 0;
 }
 
+/* --- Lossless frames ---------------------------------------------------- */
+
+static bool t6_lossless_now(const struct t6_stream *s)
+{
+	int mode = READ_ONCE(t6_param_lossless);
+
+	if (!s->raw_ok || !mode)
+		return false;
+	return mode > 0 || s->head->t6->udev->speed >= USB_SPEED_SUPER;
+}
+
+static u64 t6_lossless_delay_ns(void)
+{
+	return (u64)READ_ONCE(t6_param_lossless_delay_ms) * NSEC_PER_MSEC;
+}
+
+static unsigned long t6_lossless_jiffies(u64 ns)
+{
+	return max(1UL, nsecs_to_jiffies(ns));
+}
+
+/* Send the whole of @pixels as one raw RGB24 frame. */
+static int t6_send_raw(struct t6_stream *s)
+{
+	struct t6_head *head = s->head;
+	struct t6_device *t6 = head->t6;
+	u32 bytes = t6_raw_pitch(s->width) * s->height;
+	u32 total = T6_VIDEO_HDR_LEN + bytes;
+	struct t6_flip flip = {};
+	u32 fb;
+	u64 t0;
+	int ret;
+
+	t0 = ktime_get_ns();
+	t6_color_bgr24(s->pixels, s->width * 4, s->width, s->height,
+		       &s->enc_color, s->raw_frame + T6_VIDEO_HDR_LEN);
+	s->stats.encode_ns += ktime_get_ns() - t0;
+
+	/* Three buffers, like the JPEG targets: never the one on screen. */
+	s->raw_index = (s->raw_index + 1) % T6_FB_SLOTS;
+	fb = s->raw.fb[s->raw_index];
+
+	if (t6_wait_fences(t6, T6_MAX_INFLIGHT * t6->num_heads))
+		s->stats.fence_timeouts++;
+
+	flip.command = head->index ? T6_VIDEO_CMD_FLIP_SECONDARY :
+				     T6_VIDEO_CMD_FLIP_PRIMARY;
+	flip.payload_size = bytes;
+	flip.fence = atomic_inc_return(&t6->fence_sent);
+	flip.target_format = T6_FORMAT_RGB24;
+	flip.y_pitch = t6_raw_pitch(s->width);
+	flip.uv_pitch = 0;
+	flip.y_addr = fb;
+	flip.uv_addr = fb;
+	flip.source_format = T6_FORMAT_RGB24;
+	t6_flip_encode(&flip, s->raw_frame);
+
+	s->last_frame_ns = ktime_get_ns();
+	ret = t6_send_object(t6, fb - T6_VIDEO_HDR_LEN, s->raw_frame, total);
+	s->stats.send_ns += ktime_get_ns() - s->last_frame_ns;
+
+	if (ret) {
+		atomic_set(&t6->fence_done, flip.fence);
+		return ret;
+	}
+	s->stats.frames++;
+	s->stats.raw_frames++;
+	s->stats.bytes += total;
+	s->stats.last_frame_bytes = total;
+	return 0;
+}
+
 static void t6_stream_work(struct work_struct *work)
 {
 	struct t6_stream *s = container_of(to_delayed_work(work),
 					   struct t6_stream, work);
 	struct t6_device *t6 = s->head->t6;
 	unsigned int pitch, r, attempt;
+	bool damage, lossless;
 	long len = -ENOSPC;
 	int idx, ret;
-	u64 t0;
+	u64 t0, quiet;
 
 	if (!drm_dev_enter(&t6->drm, &idx))
 		return;
 
 	mutex_lock(&s->lock);
-	if (!s->active || bitmap_empty(s->dirty, s->nrows)) {
+	damage = s->active && !bitmap_empty(s->dirty, s->nrows);
+	if (!damage && !(s->active && s->refine)) {
 		mutex_unlock(&s->lock);
 		goto out;
 	}
@@ -273,6 +360,48 @@ static void t6_stream_work(struct work_struct *work)
 		       s->shadow + (size_t)y * pitch, (size_t)lines * pitch);
 	}
 	mutex_unlock(&s->lock);
+
+	lossless = t6_lossless_now(s);
+	quiet = ktime_get_ns() - s->last_frame_ns;
+	if (lossless && (READ_ONCE(t6_param_lossless_always) ||
+			 quiet >= t6_lossless_delay_ns())) {
+		ret = t6_send_raw(s);
+		if (!ret) {
+			s->raw_failures = 0;
+			s->refine = false;
+			/* The JPEG row cache doesn't have these rows yet. */
+			bitmap_or(s->jpeg_stale, s->jpeg_stale, s->todo,
+				  s->nrows);
+			goto out;
+		}
+		drm_err_ratelimited(&t6->drm, "head %u: raw frame failed: %d\n",
+				    s->head->index, ret);
+		if (++s->raw_failures >= T6_RAW_MAX_FAILURES) {
+			drm_warn(&t6->drm,
+				 "head %u: lossless frames keep failing; using JPEG only\n",
+				 s->head->index);
+			s->raw_ok = false;
+			s->refine = false;
+			lossless = false;
+			/* Fall through: send this update as JPEG. */
+		} else {
+			goto drop;
+		}
+	}
+
+	if (!damage) {
+		/* A refinement came due too early: try again when quiet. */
+		if (lossless && s->refine)
+			queue_delayed_work(t6->wq, &s->work,
+					   t6_lossless_jiffies(t6_lossless_delay_ns() -
+							       quiet));
+		else
+			s->refine = false;
+		goto out;
+	}
+
+	bitmap_or(s->todo, s->todo, s->jpeg_stale, s->nrows);
+	bitmap_zero(s->jpeg_stale, s->nrows);
 
 	t0 = ktime_get_ns();
 	for (attempt = 0; attempt < 4; attempt++) {
@@ -301,6 +430,11 @@ static void t6_stream_work(struct work_struct *work)
 				    s->head->index, ret);
 		goto drop;
 	}
+	/* Replace this JPEG with a lossless frame once things go quiet. */
+	s->refine = lossless;
+	if (lossless)
+		queue_delayed_work(t6->wq, &s->work,
+				   t6_lossless_jiffies(t6_lossless_delay_ns()));
 	goto out;
 
 drop:
@@ -328,6 +462,8 @@ static void t6_stream_free(struct t6_stream *s)
 		for (r = 0; r < s->nrows; r++)
 			kvfree(s->rows[r].tail);
 	kvfree(s->rows);
+	vfree(s->raw_frame);
+	bitmap_free(s->jpeg_stale);
 	kfree(s->row_cap);
 	kfree(s->todo_list);
 	bitmap_free(s->todo);
@@ -338,6 +474,10 @@ static void t6_stream_free(struct t6_stream *s)
 	vfree(s->shadow);
 
 	s->rows = NULL;
+	s->raw_frame = NULL;
+	s->jpeg_stale = NULL;
+	s->raw_ok = false;
+	s->refine = false;
 	s->row_cap = NULL;
 	s->todo_list = NULL;
 	s->todo = NULL;
@@ -380,11 +520,13 @@ int t6_stream_start(struct t6_head *head, unsigned int width,
 	s->enc = kmalloc(sizeof(*s->enc), GFP_KERNEL);
 	s->dirty = bitmap_zalloc(s->nrows, GFP_KERNEL);
 	s->todo = bitmap_zalloc(s->nrows, GFP_KERNEL);
+	s->jpeg_stale = bitmap_zalloc(s->nrows, GFP_KERNEL);
 	s->todo_list = kcalloc(s->nrows, sizeof(*s->todo_list), GFP_KERNEL);
 	s->row_cap = kcalloc(s->nrows, sizeof(*s->row_cap), GFP_KERNEL);
 	s->rows = kvcalloc(s->nrows, sizeof(*s->rows), GFP_KERNEL);
 	if (!s->shadow || !s->pixels || !s->frame || !s->enc || !s->dirty ||
-	    !s->todo || !s->todo_list || !s->row_cap || !s->rows)
+	    !s->todo || !s->jpeg_stale || !s->todo_list || !s->row_cap ||
+	    !s->rows)
 		goto nomem;
 
 	/* Typical desktop rows need a fraction of the worst case. */
@@ -400,7 +542,24 @@ int t6_stream_start(struct t6_head *head, unsigned int width,
 	t6_jpeg_init(s->enc, s->quality);
 	s->over_budget = 0;
 	s->under_budget = 0;
-	t6_stream_reset(&head->vram, &s->pos);
+
+	/*
+	 * Reserve raw framebuffers whenever they fit, so the lossless
+	 * parameter can be switched at run time.  The ring shrinks, but it
+	 * still holds several maximum-size JPEGs.
+	 */
+	s->vram = head->vram;
+	s->raw_index = 0;
+	s->raw_failures = 0;
+	s->last_frame_ns = 0;
+	if (!t6_raw_layout(&s->vram, width, height, &s->raw)) {
+		s->raw_frame = vmalloc(T6_VIDEO_HDR_LEN +
+				       t6_raw_pitch(width) * height);
+		s->raw_ok = !!s->raw_frame;
+	}
+	if (!s->raw_ok)
+		s->vram = head->vram;
+	t6_stream_reset(&s->vram, &s->pos);
 
 	mutex_lock(&s->lock);
 	s->width = width;

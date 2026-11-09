@@ -50,9 +50,13 @@ extern unsigned int t6_param_quality;
 extern unsigned int t6_param_encode_jobs;
 extern bool t6_param_hw_cursor;
 extern int t6_param_trust_damage;
+extern int t6_param_lossless;
+extern unsigned int t6_param_lossless_delay_ms;
+extern bool t6_param_lossless_always;
 
 struct t6_stats {
 	u64 frames;
+	u64 raw_frames;		/* of @frames, lossless RGB ones */
 	u64 bytes;
 	u64 rows_encoded;
 	u64 encode_ns;
@@ -101,7 +105,23 @@ struct t6_stream {
 	unsigned int quality;
 	unsigned int over_budget, under_budget;
 	u8 *frame;		/* video header + JPEG + padding */
+	struct t6_vram_layout vram;	/* head's layout, ring shortened if raw */
 	struct t6_stream_pos pos;
+
+	/*
+	 * Lossless refinement (t6_param_lossless): while the picture changes,
+	 * frames are JPEG; once it has been quiet for lossless_delay_ms a raw
+	 * RGB frame replaces the last JPEG.  @jpeg_stale holds rows that went
+	 * out raw and so still need re-encoding before the next JPEG.
+	 */
+	bool raw_ok;		/* raw frames fit in VRAM for this mode */
+	unsigned int raw_failures;	/* consecutive */
+	bool refine;		/* the frame on screen is a JPEG */
+	u64 last_frame_ns;	/* when the last frame was started */
+	struct t6_raw_layout raw;
+	unsigned int raw_index;
+	u8 *raw_frame;		/* video header + BGR pixels */
+	unsigned long *jpeg_stale;
 	struct t6_encode_job jobs[T6_MAX_ENCODE_JOBS];
 
 	struct t6_stats stats;	/* updated by the worker, read by debugfs */

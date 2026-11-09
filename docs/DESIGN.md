@@ -96,6 +96,20 @@ Three consecutive frames over budget lower the quality by 5 (minimum 30).
 quality invalidates the row cache, so it changes deliberately slowly. A frame
 too big for a 3 MiB ring object is re-encoded at once at lower quality.
 
+**Lossless refinement.** JPEG at any quality keeps 4:2:0 chroma and
+ringing around text. With `lossless` on (by default on SuperSpeed), once a
+head has been quiet for `lossless_delay_ms` the worker sends the whole frame
+as raw RGB24 (format 9, header immediately before the pixels, as the Windows
+JCD543 driver does) into one of three raw framebuffers carved off the top of
+the JPEG ring; the ring keeps at least 8 MiB. An update arriving after a quiet
+spell goes out raw at once; rapid updates stay JPEG and schedule a raw frame
+for when they stop. Rows sent raw are marked stale in the JPEG row cache and
+re-encoded before the next JPEG. Raw objects exceed the URB pool, so
+`t6_send_object()` sends them in waves under one bulk header. Three raw
+failures in a row turn lossless off for the head until the next mode set.
+`lossless_always` skips the quiet test, so every frame is raw: at ~36 ms per
+1080p frame on SuperSpeed that caps motion near 25 fps.
+
 **Failures.** A failed transfer resynchronises the chip's bulk parser (vendor
 request `0x14`, as MCT's driver does), marks the frame's rows dirty again and
 retries after 100 ms.

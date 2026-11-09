@@ -149,6 +149,44 @@ static void test_vram_layout(void)
 	CHECK(t6_vram_layout(58, 3, true, &l) == -EINVAL, "three heads accepted");
 }
 
+static void test_raw_layout(void)
+{
+	struct t6_vram_layout l;
+	struct t6_raw_layout raw;
+	u32 bytes = 1920 * 1080 * 3;
+	unsigned int i;
+
+	/* Single head, 1080p: three 6 MiB raw buffers off the ring's top. */
+	t6_vram_layout(58, 1, true, &l);
+	CHECK(!t6_raw_layout(&l, 1920, 1080, &raw), "1080p raw fits");
+	CHECK(l.ring_base == 0 && l.ring_end == MiB(28), "ring shortened");
+	for (i = 0; i < T6_FB_SLOTS; i++) {
+		CHECK(raw.fb[i] == MiB(28 + 6 * i) + T6_RAW_FB_OFFSET,
+		      "raw fb %u at %#x", i, raw.fb[i]);
+		CHECK(raw.fb[i] - T6_VIDEO_HDR_LEN >= l.ring_end,
+		      "raw header %u overlaps the ring", i);
+		CHECK(raw.fb[i] + bytes <= l.fb[0], "raw fb %u overlaps NV12", i);
+		CHECK(raw.fb[i] % 64 == 0, "raw fb %u unaligned", i);
+	}
+	CHECK(raw.fb[1] - raw.fb[0] >= bytes + T6_VIDEO_HDR_LEN, "raw overlap");
+	CHECK(l.ring_end - l.ring_base >= T6_RING_MAX_OBJECT, "ring too small");
+
+	/* Dual head: the primary has room, the secondary's 6 MiB ring not. */
+	t6_vram_layout(58, 2, true, &l);
+	CHECK(!t6_raw_layout(&l, 1920, 1080, &raw), "dual primary raw");
+	CHECK(l.ring_end - l.ring_base >= T6_RAW_MIN_RING, "dual ring kept");
+	t6_vram_layout(58, 2, false, &l);
+	CHECK(t6_raw_layout(&l, 1920, 1080, &raw) == -ENOSPC,
+	      "dual secondary raw must not fit");
+	CHECK(l.ring_end == MiB(46), "failed raw layout changed the ring");
+
+	t6_vram_layout(58, 1, true, &l);
+	CHECK(!t6_raw_layout(&l, 2048, 1152, &raw), "2048x1152 raw");
+	t6_vram_layout(58, 1, true, &l);
+	CHECK(t6_raw_layout(&l, 3840, 2160, &raw) == -ENOSPC, "4K raw");
+	CHECK(t6_raw_layout(&l, 0, 1080, &raw) == -ENOSPC, "zero width");
+}
+
 static void test_mode_fits(void)
 {
 	CHECK(t6_mode_fits_vram(1920, 1080), "1080p");
@@ -256,6 +294,7 @@ int main(void)
 	test_flip();
 	test_bulk_hdr();
 	test_vram_layout();
+	test_raw_layout();
 	test_mode_fits();
 	test_stream();
 	test_interrupt();

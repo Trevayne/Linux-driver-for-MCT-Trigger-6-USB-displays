@@ -69,13 +69,16 @@ static unsigned int t6_frame_budget(const struct t6_device *t6)
 static int t6_encode_one_row(struct t6_stream *s, unsigned int r)
 {
 	struct t6_jpeg_row *row = &s->rows[r];
+	const struct t6_jpeg_color *color =
+		s->enc_color.use_ctm || s->enc_color.use_lut ? &s->enc_color :
+							       NULL;
 	unsigned int pitch = s->width * 4;
 	size_t cap;
 	u8 *buf;
 	int ret;
 
 	ret = t6_jpeg_encode_row(s->enc, s->pixels, pitch, s->width, s->height,
-				 r, row, s->row_cap[r]);
+				 r, color, row, s->row_cap[r]);
 	if (ret != -ENOSPC)
 		return ret;
 
@@ -89,7 +92,7 @@ static int t6_encode_one_row(struct t6_stream *s, unsigned int r)
 	s->row_cap[r] = cap;
 
 	return t6_jpeg_encode_row(s->enc, s->pixels, pitch, s->width,
-				  s->height, r, row, cap);
+				  s->height, r, color, row, cap);
 }
 
 static void t6_encode_job_run(struct t6_encode_job *job)
@@ -259,6 +262,8 @@ static void t6_stream_work(struct work_struct *work)
 	}
 	bitmap_copy(s->todo, s->dirty, s->nrows);
 	bitmap_zero(s->dirty, s->nrows);
+	/* t6_stream_set_color() marked every row dirty when this changed. */
+	s->enc_color = s->color;
 	pitch = s->width * 4;
 	for_each_set_bit(r, s->todo, s->nrows) {
 		unsigned int y = r * T6_JPEG_MCU;
@@ -489,6 +494,40 @@ void t6_stream_update_changed(struct t6_head *head, const void *src,
 	}
 	if (changed)
 		mod_delayed_work(head->t6->wq, &s->work, 0);
+unlock:
+	mutex_unlock(&s->lock);
+}
+
+/*
+ * Set colour management from the CRTC's CTM matrix (struct drm_color_ctm)
+ * and gamma LUT (T6_JPEG_LUT_SIZE struct drm_color_lut entries); NULL for
+ * none.  Every cached row was encoded with the old settings, so a change
+ * re-sends the whole frame.
+ */
+void t6_stream_set_color(struct t6_head *head, const u64 *ctm,
+			 const u16 *gamma_lut)
+{
+	struct t6_stream *s = &head->stream;
+	struct t6_jpeg_color *c = &s->color_new;
+
+	mutex_lock(&s->lock);
+	memset(c, 0, sizeof(*c));
+	if (ctm)
+		c->use_ctm = t6_jpeg_ctm_from_drm(ctm, c->ctm);
+	if (!c->use_ctm)
+		memset(c->ctm, 0, sizeof(c->ctm));
+	if (gamma_lut)
+		c->use_lut = t6_jpeg_lut_from_drm(gamma_lut, c->lut);
+	if (!c->use_lut)
+		memset(c->lut, 0, sizeof(c->lut));
+
+	if (!memcmp(c, &s->color, sizeof(*c)))
+		goto unlock;
+	s->color = *c;
+	if (s->active) {
+		bitmap_fill(s->dirty, s->nrows);
+		mod_delayed_work(head->t6->wq, &s->work, 0);
+	}
 unlock:
 	mutex_unlock(&s->lock);
 }

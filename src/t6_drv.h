@@ -85,9 +85,13 @@ struct t6_stream {
 	unsigned int width, height;
 	u8 *shadow;
 	unsigned long *dirty;
+	/* From the CRTC's CTM and GAMMA_LUT; kept across mode sets. */
+	struct t6_jpeg_color color;
+	struct t6_jpeg_color color_new;	/* scratch for t6_stream_set_color() */
 
 	/* Worker side; only touched by @work (or with it stopped). */
 	u8 *pixels;
+	struct t6_jpeg_color enc_color;	/* what the rows being encoded use */
 	unsigned int nrows;
 	unsigned long *todo;
 	u16 *todo_list;
@@ -215,6 +219,8 @@ void t6_stream_update(struct t6_head *head, const void *src,
 		      unsigned int src_pitch, const struct drm_rect *clip);
 void t6_stream_update_changed(struct t6_head *head, const void *src,
 			      unsigned int src_pitch);
+void t6_stream_set_color(struct t6_head *head, const u64 *ctm,
+			 const u16 *gamma_lut);
 void t6_stream_fini(struct t6_head *head);
 
 #endif /* T6_DRV_H */

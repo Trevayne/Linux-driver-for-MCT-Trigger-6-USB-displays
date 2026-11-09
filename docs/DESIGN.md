@@ -103,7 +103,9 @@ as raw RGB24 (format 9, header immediately before the pixels, as the Windows
 JCD543 driver does) into one of three raw framebuffers carved off the top of
 the JPEG ring; the ring keeps at least 8 MiB. An update arriving after a quiet
 spell goes out raw at once; rapid updates stay JPEG and schedule a raw frame
-for when they stop. Rows sent raw are marked stale in the JPEG row cache and
+for when they stop. Quiet time is measured between damage arrivals, not from
+frame sends, so a link where a raw frame takes longer than the delay (USB 2
+with `lossless=1`) still falls back to JPEG during motion. Rows sent raw are marked stale in the JPEG row cache and
 re-encoded before the next JPEG. Raw objects exceed the URB pool, so
 `t6_send_object()` sends them in waves under one bulk header. Three raw
 failures in a row turn lossless off for the head until the next mode set.

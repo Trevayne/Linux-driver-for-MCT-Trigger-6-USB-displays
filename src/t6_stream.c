@@ -240,7 +240,6 @@ static int t6_send_frame(struct t6_stream *s, unsigned int jpeg_len)
 	t6_flip_encode(&flip, s->frame);
 
 	t0 = ktime_get_ns();
-	s->last_frame_ns = t0;
 	ret = t6_send_object(t6, ring_addr, s->frame, total);
 	s->stats.send_ns += ktime_get_ns() - t0;
 
@@ -312,9 +311,9 @@ static int t6_send_raw(struct t6_stream *s)
 	flip.source_format = T6_FORMAT_RGB24;
 	t6_flip_encode(&flip, s->raw_frame);
 
-	s->last_frame_ns = ktime_get_ns();
+	t0 = ktime_get_ns();
 	ret = t6_send_object(t6, fb - T6_VIDEO_HDR_LEN, s->raw_frame, total);
-	s->stats.send_ns += ktime_get_ns() - s->last_frame_ns;
+	s->stats.send_ns += ktime_get_ns() - t0;
 
 	if (ret) {
 		atomic_set(&t6->fence_done, flip.fence);
@@ -336,7 +335,7 @@ static void t6_stream_work(struct work_struct *work)
 	bool damage, lossless;
 	long len = -ENOSPC;
 	int idx, ret;
-	u64 t0, quiet;
+	u64 t0, quiet, damage_ns;
 
 	if (!drm_dev_enter(&t6->drm, &idx))
 		return;
@@ -347,6 +346,7 @@ static void t6_stream_work(struct work_struct *work)
 		mutex_unlock(&s->lock);
 		goto out;
 	}
+	damage_ns = s->damage_ns;
 	bitmap_copy(s->todo, s->dirty, s->nrows);
 	bitmap_zero(s->dirty, s->nrows);
 	/* t6_stream_set_color() marked every row dirty when this changed. */
@@ -361,8 +361,16 @@ static void t6_stream_work(struct work_struct *work)
 	}
 	mutex_unlock(&s->lock);
 
+	/*
+	 * Quiet time: for new damage, how long the picture had been still
+	 * before it arrived; for a pending refinement, how long it has been
+	 * still now.  Send times don't count, so a slow link doesn't make
+	 * continuous motion look quiet.
+	 */
 	lossless = t6_lossless_now(s);
-	quiet = ktime_get_ns() - s->last_frame_ns;
+	quiet = (damage ? damage_ns : ktime_get_ns()) - s->prev_damage_ns;
+	if (damage)
+		s->prev_damage_ns = damage_ns;
 	if (lossless && (READ_ONCE(t6_param_lossless_always) ||
 			 quiet >= t6_lossless_delay_ns())) {
 		ret = t6_send_raw(s);
@@ -551,7 +559,7 @@ int t6_stream_start(struct t6_head *head, unsigned int width,
 	s->vram = head->vram;
 	s->raw_index = 0;
 	s->raw_failures = 0;
-	s->last_frame_ns = 0;
+	s->prev_damage_ns = 0;
 	if (!t6_raw_layout(&s->vram, width, height, &s->raw)) {
 		s->raw_frame = vmalloc(T6_VIDEO_HDR_LEN +
 				       t6_raw_pitch(width) * height);
@@ -565,6 +573,7 @@ int t6_stream_start(struct t6_head *head, unsigned int width,
 	s->width = width;
 	s->height = height;
 	bitmap_fill(s->dirty, s->nrows);	/* first frame is complete */
+	s->damage_ns = ktime_get_ns();
 	s->active = true;
 	mutex_unlock(&s->lock);
 	return 0;
@@ -618,6 +627,7 @@ void t6_stream_update(struct t6_head *head, const void *src,
 
 	bitmap_set(s->dirty, r.y1 / T6_JPEG_MCU,
 		   (r.y2 - 1) / T6_JPEG_MCU - r.y1 / T6_JPEG_MCU + 1);
+	s->damage_ns = ktime_get_ns();
 	/* Run now, overriding a pending retry back-off. */
 	mod_delayed_work(head->t6->wq, &s->work, 0);
 unlock:
@@ -651,8 +661,10 @@ void t6_stream_update_changed(struct t6_head *head, const void *src,
 		__set_bit(y / T6_JPEG_MCU, s->dirty);
 		changed = true;
 	}
-	if (changed)
+	if (changed) {
+		s->damage_ns = ktime_get_ns();
 		mod_delayed_work(head->t6->wq, &s->work, 0);
+	}
 unlock:
 	mutex_unlock(&s->lock);
 }
@@ -685,6 +697,7 @@ void t6_stream_set_color(struct t6_head *head, const u64 *ctm,
 	s->color = *c;
 	if (s->active) {
 		bitmap_fill(s->dirty, s->nrows);
+		s->damage_ns = ktime_get_ns();
 		mod_delayed_work(head->t6->wq, &s->work, 0);
 	}
 unlock:

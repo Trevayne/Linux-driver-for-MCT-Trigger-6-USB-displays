@@ -89,6 +89,7 @@ struct t6_stream {
 	unsigned int width, height;
 	u8 *shadow;
 	unsigned long *dirty;
+	u64 damage_ns;		/* when damage last arrived */
 	/* From the CRTC's CTM and GAMMA_LUT; kept across mode sets. */
 	struct t6_jpeg_color color;
 	struct t6_jpeg_color color_new;	/* scratch for t6_stream_set_color() */
@@ -111,13 +112,15 @@ struct t6_stream {
 	/*
 	 * Lossless refinement (t6_param_lossless): while the picture changes,
 	 * frames are JPEG; once it has been quiet for lossless_delay_ms a raw
-	 * RGB frame replaces the last JPEG.  @jpeg_stale holds rows that went
+	 * RGB frame replaces the last JPEG.  "Quiet" is measured between
+	 * damage arrivals, so it doesn't depend on how long frames take to
+	 * send.  @jpeg_stale holds rows that went
 	 * out raw and so still need re-encoding before the next JPEG.
 	 */
 	bool raw_ok;		/* raw frames fit in VRAM for this mode */
 	unsigned int raw_failures;	/* consecutive */
 	bool refine;		/* the frame on screen is a JPEG */
-	u64 last_frame_ns;	/* when the last frame was started */
+	u64 prev_damage_ns;	/* damage_ns of the last batch sent */
 	struct t6_raw_layout raw;
 	unsigned int raw_index;
 	u8 *raw_frame;		/* video header + BGR pixels */

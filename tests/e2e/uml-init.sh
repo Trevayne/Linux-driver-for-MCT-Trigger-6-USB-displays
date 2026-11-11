@@ -158,7 +158,8 @@ run_pass nofence --no-fence
 # A raw 1080p frame takes seconds to send in UML.  t6drm's burst step sends
 # its second update when the first frame lands, one send time after the
 # first update; a 5 s delay keeps that inside "motion", so it goes out as
-# JPEG and is refined 5 s later.  t6drm must wait longer than that before
+# JPEG and is refined 5 s later.  It also exercises lossless_min_fps: a
+# raw frame that slow is far below 20 fps, so motion must fall back to JPEG.  t6drm must wait longer than that before
 # calling a step done, hence the 12 s settle (8 s when every frame is raw).
 echo 1 > /sys/module/mct_t6/parameters/lossless &&
 	echo 5000 > /sys/module/mct_t6/parameters/lossless_delay_ms &&

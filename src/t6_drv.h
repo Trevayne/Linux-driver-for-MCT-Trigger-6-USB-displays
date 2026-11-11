@@ -53,6 +53,7 @@ extern int t6_param_trust_damage;
 extern int t6_param_lossless;
 extern unsigned int t6_param_lossless_delay_ms;
 extern bool t6_param_lossless_always;
+extern unsigned int t6_param_lossless_min_fps;
 
 struct t6_stats {
 	u64 frames;
@@ -121,6 +122,12 @@ struct t6_stream {
 	unsigned int raw_failures;	/* consecutive */
 	bool refine;		/* the frame on screen is a JPEG */
 	u64 prev_damage_ns;	/* damage_ns of the last batch sent */
+	/*
+	 * Motion goes out raw while raw frames, on average @raw_cost_ns
+	 * each, still reach lossless_min_fps (t6_raw_motion_next()).
+	 */
+	u64 raw_cost_ns;	/* running average, 0 = not yet measured */
+	bool raw_motion;
 	struct t6_raw_layout raw;
 	unsigned int raw_index;
 	u8 *raw_frame;		/* video header + BGR pixels */

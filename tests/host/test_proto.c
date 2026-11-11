@@ -187,6 +187,32 @@ static void test_raw_layout(void)
 	CHECK(t6_raw_layout(&l, 0, 1080, &raw) == -ENOSPC, "zero width");
 }
 
+static void test_raw_motion(void)
+{
+	const u64 ms = 1000000;
+
+	/* The cost average: first sample as is, then weighted 3:1. */
+	CHECK(t6_raw_cost_update(0, 36 * ms) == 36 * ms, "first sample");
+	CHECK(t6_raw_cost_update(36 * ms, 40 * ms) == 37 * ms, "average");
+
+	/* min_fps 0: motion is never raw. */
+	CHECK(!t6_raw_motion_next(true, 1 * ms, 0), "min_fps 0");
+	/* Unmeasured: try raw. */
+	CHECK(t6_raw_motion_next(false, 0, 20), "unmeasured tries raw");
+
+	/* 1080p on SuperSpeed (~36 ms) keeps raw at 20 fps (50 ms). */
+	CHECK(t6_raw_motion_next(true, 36 * ms, 20), "36 ms at 20 fps");
+	CHECK(t6_raw_motion_next(true, 50 * ms, 20), "exactly the period");
+	/* Too slow (USB 2, two heads): fall back to JPEG for motion. */
+	CHECK(!t6_raw_motion_next(true, 51 * ms, 20), "51 ms at 20 fps");
+	CHECK(!t6_raw_motion_next(true, 180 * ms, 20), "USB 2 raw");
+
+	/* Hysteresis: back to raw only below 7/8 of the period. */
+	CHECK(!t6_raw_motion_next(false, 50 * ms, 20), "no flip at period");
+	CHECK(!t6_raw_motion_next(false, 44 * ms, 20), "no flip at 44 ms");
+	CHECK(t6_raw_motion_next(false, 43 * ms, 20), "flip at 43 ms");
+}
+
 static void test_mode_fits(void)
 {
 	CHECK(t6_mode_fits_vram(1920, 1080), "1080p");
@@ -295,6 +321,7 @@ int main(void)
 	test_bulk_hdr();
 	test_vram_layout();
 	test_raw_layout();
+	test_raw_motion();
 	test_mode_fits();
 	test_stream();
 	test_interrupt();

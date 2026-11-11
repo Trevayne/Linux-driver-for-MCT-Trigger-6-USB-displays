@@ -56,7 +56,12 @@ MODULE_PARM_DESC(lossless_delay_ms,
 bool t6_param_lossless_always;
 module_param_named(lossless_always, t6_param_lossless_always, bool, 0644);
 MODULE_PARM_DESC(lossless_always,
-		 "When lossless is in effect, send every frame lossless, never JPEG: best picture, but motion is limited to ~25 fps at 1080p (default false)");
+		 "When lossless is in effect, send every frame lossless, never JPEG, however slow (default false; lossless_min_fps already keeps motion lossless while the link allows)");
+
+unsigned int t6_param_lossless_min_fps = 20;
+module_param_named(lossless_min_fps, t6_param_lossless_min_fps, uint, 0644);
+MODULE_PARM_DESC(lossless_min_fps,
+		 "When lossless is in effect, moving content is sent lossless too while lossless frames still reach this rate; below it, motion is JPEG and the still picture is refined. 0 = motion always JPEG (default 20)");
 
 int t6_param_trust_damage = -1;
 module_param_named(trust_damage, t6_param_trust_damage, int, 0644);
@@ -205,9 +210,11 @@ static int t6_stats_show(struct seq_file *m, void *unused)
 		const struct t6_stats *st = &s->stats;
 
 		seq_printf(m,
-			   "head %u: %ux%u quality %u lossless %s frames %llu raw_frames %llu bytes %llu last %u rows %llu dropped %llu fence_timeouts %llu encode_ms %llu send_ms %llu\n",
+			   "head %u: %ux%u quality %u lossless %s motion %s raw_cost_ms %llu frames %llu raw_frames %llu bytes %llu last %u rows %llu dropped %llu fence_timeouts %llu encode_ms %llu send_ms %llu\n",
 			   t6->heads[i].index, s->width, s->height, s->quality,
 			   s->raw_ok ? "yes" : "no",
+			   s->raw_ok && s->raw_motion ? "raw" : "jpeg",
+			   div_u64(s->raw_cost_ns, NSEC_PER_MSEC),
 			   st->frames, st->raw_frames, st->bytes,
 			   st->last_frame_bytes,
 			   st->rows_encoded, st->dropped, st->fence_timeouts,

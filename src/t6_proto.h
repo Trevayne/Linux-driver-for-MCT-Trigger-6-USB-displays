@@ -204,6 +204,32 @@ static inline u32 t6_raw_pitch(unsigned int width)
 int t6_raw_layout(struct t6_vram_layout *l, unsigned int width,
 		  unsigned int height, struct t6_raw_layout *raw);
 
+/*
+ * Lossless motion policy.  While the picture moves, raw frames are used for
+ * as long as they can still be delivered at the configured minimum frame
+ * rate; below it, motion goes out as JPEG and the still picture is refined
+ * with a raw frame.  @avg_ns is a running average of what one raw frame
+ * costs (conversion, fence wait and transfer), 0 if not yet measured.
+ */
+#define T6_RAW_COST_WEIGHT	4	/* average over ~4 frames */
+
+/**
+ * t6_raw_cost_update() - fold one raw frame's cost into the running average
+ * Return: the new average; the first measurement is taken as is.
+ */
+u64 t6_raw_cost_update(u64 avg_ns, u64 frame_ns);
+
+/**
+ * t6_raw_motion_next() - decide whether moving content goes out raw
+ * @cur: the current decision
+ * @avg_ns: running raw frame cost, 0 if unknown (try raw)
+ * @min_fps: lowest acceptable raw frame rate; 0 = never raw during motion
+ *
+ * Switching back to raw needs 1/8 headroom below the frame period, so a
+ * cost close to the limit doesn't flip the decision on every frame.
+ */
+bool t6_raw_motion_next(bool cur, u64 avg_ns, unsigned int min_fps);
+
 /* Ring cursor and framebuffer rotation for one head. */
 struct t6_stream_pos {
 	u32 ring_next;

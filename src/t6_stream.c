@@ -29,8 +29,14 @@
  * lossless_delay_ms the worker sends the whole frame again as raw RGB24,
  * which the chip scans out untouched.  An update arriving after such a
  * quiet spell goes out raw straight away; rapid updates (scrolling, video)
- * stay JPEG, which is an order of magnitude smaller.  With lossless_always
- * every frame is raw, trading frame rate for picture quality.
+ * stay JPEG, which is an order of magnitude smaller.
+ *
+ * Best picture first: rapid updates go out raw as well for as long as raw
+ * frames, timed as they are sent, still reach lossless_min_fps.  Only when
+ * the link can't manage that (USB 2, two busy heads, a slow host) does
+ * motion fall back to JPEG with a raw refinement once things settle, and
+ * only when JPEG frames overrun the link does their quality drop.  With
+ * lossless_always every frame is raw, however slow.
  */
 #include <linux/bitmap.h>
 #include <linux/cpumask.h>
@@ -270,6 +276,24 @@ static u64 t6_lossless_delay_ns(void)
 	return (u64)READ_ONCE(t6_param_lossless_delay_ms) * NSEC_PER_MSEC;
 }
 
+/* Should this update, arriving during motion, go out raw? */
+static bool t6_raw_for_motion(struct t6_stream *s)
+{
+	bool was = s->raw_motion;
+
+	if (READ_ONCE(t6_param_lossless_always))
+		return true;
+	s->raw_motion = t6_raw_motion_next(was, s->raw_cost_ns,
+					   READ_ONCE(t6_param_lossless_min_fps));
+	if (s->raw_motion != was)
+		drm_dbg_driver(&s->head->t6->drm,
+			       "head %u: motion now %s (raw frame %llu us)\n",
+			       s->head->index,
+			       s->raw_motion ? "lossless" : "JPEG",
+			       div_u64(s->raw_cost_ns, NSEC_PER_USEC));
+	return s->raw_motion;
+}
+
 static unsigned long t6_lossless_jiffies(u64 ns)
 {
 	return max(1UL, nsecs_to_jiffies(ns));
@@ -284,10 +308,10 @@ static int t6_send_raw(struct t6_stream *s)
 	u32 total = T6_VIDEO_HDR_LEN + bytes;
 	struct t6_flip flip = {};
 	u32 fb;
-	u64 t0;
+	u64 t0, start;
 	int ret;
 
-	t0 = ktime_get_ns();
+	start = t0 = ktime_get_ns();
 	t6_color_bgr24(s->pixels, s->width * 4, s->width, s->height,
 		       &s->enc_color, s->raw_frame + T6_VIDEO_HDR_LEN);
 	s->stats.encode_ns += ktime_get_ns() - t0;
@@ -319,6 +343,9 @@ static int t6_send_raw(struct t6_stream *s)
 		atomic_set(&t6->fence_done, flip.fence);
 		return ret;
 	}
+	/* What a raw frame costs end to end decides raw for motion. */
+	s->raw_cost_ns = t6_raw_cost_update(s->raw_cost_ns,
+					    ktime_get_ns() - start);
 	s->stats.frames++;
 	s->stats.raw_frames++;
 	s->stats.bytes += total;
@@ -371,8 +398,8 @@ static void t6_stream_work(struct work_struct *work)
 	quiet = (damage ? damage_ns : ktime_get_ns()) - s->prev_damage_ns;
 	if (damage)
 		s->prev_damage_ns = damage_ns;
-	if (lossless && (READ_ONCE(t6_param_lossless_always) ||
-			 quiet >= t6_lossless_delay_ns())) {
+	if (lossless && (quiet >= t6_lossless_delay_ns() ||
+			 (damage && t6_raw_for_motion(s)))) {
 		ret = t6_send_raw(s);
 		if (!ret) {
 			s->raw_failures = 0;
@@ -560,6 +587,8 @@ int t6_stream_start(struct t6_head *head, unsigned int width,
 	s->raw_index = 0;
 	s->raw_failures = 0;
 	s->prev_damage_ns = 0;
+	s->raw_cost_ns = 0;
+	s->raw_motion = true;
 	if (!t6_raw_layout(&s->vram, width, height, &s->raw)) {
 		s->raw_frame = vmalloc(T6_VIDEO_HDR_LEN +
 				       t6_raw_pitch(width) * height);

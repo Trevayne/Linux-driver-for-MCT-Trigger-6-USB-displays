@@ -181,6 +181,28 @@ int t6_raw_layout(struct t6_vram_layout *l, unsigned int width,
 	return 0;
 }
 
+u64 t6_raw_cost_update(u64 avg_ns, u64 frame_ns)
+{
+	if (!avg_ns)
+		return frame_ns;
+	return (avg_ns * (T6_RAW_COST_WEIGHT - 1) + frame_ns) /
+	       T6_RAW_COST_WEIGHT;
+}
+
+bool t6_raw_motion_next(bool cur, u64 avg_ns, unsigned int min_fps)
+{
+	u64 period;
+
+	if (!min_fps)
+		return false;
+	if (!avg_ns)
+		return true;
+	period = 1000000000U / min_fps;
+	if (cur)
+		return avg_ns <= period;
+	return avg_ns * 8 < period * 7;
+}
+
 void t6_stream_reset(const struct t6_vram_layout *l, struct t6_stream_pos *s)
 {
 	s->ring_next = l->ring_base;

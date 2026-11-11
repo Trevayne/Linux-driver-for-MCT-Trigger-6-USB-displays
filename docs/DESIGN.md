@@ -109,8 +109,20 @@ with `lossless=1`) still falls back to JPEG during motion. Rows sent raw are mar
 re-encoded before the next JPEG. Raw objects exceed the URB pool, so
 `t6_send_object()` sends them in waves under one bulk header. Three raw
 failures in a row turn lossless off for the head until the next mode set.
-`lossless_always` skips the quiet test, so every frame is raw: at ~36 ms per
-1080p frame on SuperSpeed that caps motion near 25 fps.
+**Best picture first.** Rapid updates go out raw as well, for as long as raw
+frames still reach `lossless_min_fps` (default 20). Each raw frame is timed
+from conversion to the end of its transfer, fence wait included, and the
+times are averaged over about four frames (`t6_raw_cost_update()`). Above the
+frame period, motion falls back to JPEG with refinement. It returns to raw
+only once the average is below 7/8 of the period, so a cost near the limit
+doesn't flip on every frame (`t6_raw_motion_next()`). While motion is JPEG,
+the refinement frames keep the average current. Then, if JPEG frames still
+overrun the link, quality control lowers JPEG quality. The order is: raw
+always, then JPEG in motion with raw refinement, then lower JPEG quality.
+At ~36 ms per 1080p frame on SuperSpeed (~27 fps), one head stays raw
+throughout. Two heads, or USB 2 with `lossless=1`, fall back. debugfs
+`stats` shows `motion raw|jpeg` and `raw_cost_ms`. `lossless_always` skips
+both tests, so every frame is raw however slow.
 
 **Failures.** A failed transfer resynchronises the chip's bulk parser (vendor
 request `0x14`, as MCT's driver does), marks the frame's rows dirty again and
